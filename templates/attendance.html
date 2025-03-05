@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h2 class="text-2xl font-bold mb-6">Attendance</h2>
+    
+    <div class="mb-8">
+        <h3 class="text-xl font-semibold mb-4">Mark Attendance</h3>
+        <form action="{{ url_for('mark_attendance') }}" method="POST" class="max-w-md">
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Select Member</label>
+                <select name="member_id" class="form-control" required>
+                    {% for member in members %}
+                    <option value="{{ member.id }}">{{ member.name }} (ID: {{ member.id }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Mark Attendance</button>
+        </form>
+    </div>
+    
+    <div>
+        <h3 class="text-xl font-semibold mb-4">Today's Attendance</h3>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Member ID</th>
+                        <th>Member Name</th>
+                        <th>Check-in Time</th>
+                        <th>Check-out Time</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in attendance %}
+                    <tr>
+                        <td>{{ record.date }}</td>
+                        <td>{{ record.member_id }}</td>
+                        <td>{{ record.member_name }}</td>
+                        <td>{{ record.check_in }}</td>
+                        <td>{{ record.check_out if record.check_out else 'Not checked out' }}</td>
+                        <td>
+                            {% if not record.check_out %}
+                            <form action="{{ url_for('mark_attendance') }}" method="POST" class="d-inline">
+                                <input type="hidden" name="member_id" value="{{ record.member_id }}">
+                                <button type="submit" class="btn btn-warning btn-sm">Check Out</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

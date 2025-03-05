@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Receptionist Dashboard</h2>
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Members</h5>
+                    <p class="card-text">Manage members</p>
+                    <a href="{{ url_for('view_members') }}" class="btn btn-primary">View Members</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Attendance</h5>
+                    <p class="card-text">Mark attendance</p>
+                    <a href="{{ url_for('attendance') }}" class="btn btn-primary">Manage Attendance</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Payments</h5>
+                    <p class="card-text">Handle payments</p>
+                    <a href="{{ url_for('payments') }}" class="btn btn-primary">View Payments</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

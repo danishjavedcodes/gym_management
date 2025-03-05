@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <a href="{{ url_for('admin_dashboard' if session.user_type == 'admin' else 'receptionist_dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+        <h2 class="text-2xl font-bold">Reports</h2>
+        <div></div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Current Month Revenue</h5>
+                    <p class="card-text h3">₹{{ monthly_revenue }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Members</h5>
+                    <p class="card-text h3">{{ total_members }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Today's Attendance</h5>
+                    <p class="card-text h3">{{ today_attendance }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <!-- Revenue Chart -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h4>Revenue Trend (Past 6 Months)</h4>
+                </div>
+                <div class="card-body">
+                    <div style="height: 300px;">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+        <!-- Package Distribution -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h4>Member Package Distribution</h4>
+                </div>
+                <div class="card-body">
+                    <div style="height: 300px;">
+                        <canvas id="packageChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Calendar -->
+    <div class="card">
+        <div class="card-header">
+            <h4>Monthly Attendance ({{ current_month }})</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered text-center">
+                    <thead>
+                        <tr>
+                            <th>Sun</th>
+                            <th>Mon</th>
+                            <th>Tue</th>
+                            <th>Wed</th>
+                            <th>Thu</th>
+                            <th>Fri</th>
+                            <th>Sat</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set ns = namespace(date_index=0) %}
+                        {% for week in range((calendar_data|length + 6) // 7) %}
+                            <tr>
+                                {% for day in range(7) %}
+                                    {% if ns.date_index < calendar_data|length %}
+                                        {% set attendance = calendar_data[ns.date_index] %}
+                                        <td>
+                                            <div>{{ attendance.date.split('-')[2] }}</div>
+                                            <div class="small text-muted">{{ attendance.count }} visits</div>
+                                        </td>
+                                        {% set ns.date_index = ns.date_index + 1 %}
+                                    {% else %}
+                                        <td></td>
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Revenue Chart
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'line',
+        data: {
+            labels: {{ past_6_months | tojson }},
+            datasets: [{
+                label: 'Monthly Revenue',
+                data: {{ revenue_data | tojson }},
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Package Distribution Chart
+    new Chart(document.getElementById('packageChart'), {
+        type: 'pie',
+        data: {
+            labels: {{ package_distribution.keys() | list | tojson }},
+            datasets: [{
+                data: {{ package_distribution.values() | list | tojson }},
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(153, 102, 255, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2
+        }
+    });
+</script>
+{% endblock %}

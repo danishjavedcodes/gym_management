@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Receptionists Management</h2>
+    <div class="row mb-4">
+        <div class="col">
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addReceptionistModal">
+                Add New Receptionist
+            </button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for receptionist in receptionists %}
+                <tr>
+                    <td>{{ receptionist.name }}</td>
+                    <td>{{ receptionist.username }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary">Edit</button>
+                        <button class="btn btn-sm btn-danger">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Receptionist Modal -->
+<div class="modal fade" id="addReceptionistModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Receptionist</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('add_receptionist') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Receptionist</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

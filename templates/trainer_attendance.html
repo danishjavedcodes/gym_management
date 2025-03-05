@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h2 class="text-2xl font-bold mb-6">Trainer Attendance</h2>
+    
+    <div class="mb-8">
+        <h3 class="text-xl font-semibold mb-4">Mark Attendance</h3>
+        <form action="{{ url_for('mark_trainer_attendance') }}" method="POST" class="max-w-md">
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Select Trainer</label>
+                <select name="trainer_id" class="form-control" required>
+                    {% for trainer in trainers %}
+                    <option value="{{ trainer.id }}">{{ trainer.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Mark Attendance</button>
+        </form>
+    </div>
+    
+    <div>
+        <h3 class="text-xl font-semibold mb-4">Today's Attendance</h3>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Trainer Name</th>
+                        <th>Check In</th>
+                        <th>Check Out</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in attendance %}
+                    <tr>
+                        <td>{{ record.trainer_name }}</td>
+                        <td>{{ record.check_in }}</td>
+                        <td>{{ record.check_out if record.check_out else 'Not checked out' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

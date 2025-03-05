@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Membership Packages</h2>
+    
+    <!-- Add Package Form -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Add New Package</h5>
+            <form action="{{ url_for('add_package') }}" method="POST">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Package Name</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Price (₹)</label>
+                        <input type="number" name="price" class="form-control" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Duration (months)</label>
+                        <input type="number" name="duration" class="form-control" required>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Trainers</label>
+                        <select name="trainers" class="form-control" required>
+                            <option value="No">No Trainer</option>
+                            <option value="Personal">Personal Trainer</option>
+                            <option value="Group">Group Training</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Cardio Access</label>
+                        <select name="cardio_access" class="form-control" required>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Timings</label>
+                        <select name="timings" class="form-control" required>
+                            <option value="Morning">Morning (6 AM - 11 AM)</option>
+                            <option value="Evening">Evening (4 PM - 9 PM)</option>
+                            <option value="All Day">All Day Access</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Package</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Packages List -->
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Price</th>
+                    <th>Duration</th>
+                    <th>Trainers</th>
+                    <th>Cardio Access</th>
+                    <th>Timings</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for package in packages %}
+                <tr>
+                    <td>{{ package.name }}</td>
+                    <td>₹{{ package.price }}</td>
+                    <td>{{ package.duration }} months</td>
+                    <td>{{ package.trainers }}</td>
+                    <td>{{ package.cardio_access }}</td>
+                    <td>{{ package.timings }}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="deletePackage('{{ package.name }}')">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
