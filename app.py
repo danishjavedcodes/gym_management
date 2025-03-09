@@ -257,11 +257,8 @@ def mark_attendance():
         attendance_df = pd.read_excel('data/attendance.xlsx')
         members_df = pd.read_excel('data/members.xlsx')
         
-        # Ensure check_out column exists
-        if 'check_out' not in attendance_df.columns:
-            attendance_df['check_out'] = None
-        
         member_id = request.form.get('member_id')
+        action = request.form.get('action')
         member_query = members_df[members_df['id'].astype(str) == str(member_id)]
         
         if member_query.empty:
@@ -272,34 +269,37 @@ def mark_attendance():
         today = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H:%M:%S')
         
-        # Check if member has already checked in today
         today_attendance = attendance_df[
             (attendance_df['date'] == today) & 
             (attendance_df['member_id'].astype(str) == str(member_id))
         ]
         
-        if today_attendance.empty:
-            # Check in
-            new_attendance = {
-                'date': today,
-                'member_id': str(member_id),
-                'member_name': member['name'],
-                'check_in': current_time,
-                'check_out': None
-            }
-            attendance_df = pd.concat([attendance_df, pd.DataFrame([new_attendance])], ignore_index=True)
-            flash('Check-in recorded successfully')
-        else:
-            # Check out
-            if pd.isna(today_attendance.iloc[0]['check_out']):
+        if action == 'check_in':
+            if not today_attendance.empty:
+                flash('Member has already checked in today')
+            else:
+                new_attendance = {
+                    'date': today,
+                    'member_id': str(member_id),
+                    'member_name': member['name'],
+                    'check_in': current_time,
+                    'check_out': None
+                }
+                attendance_df = pd.concat([attendance_df, pd.DataFrame([new_attendance])], ignore_index=True)
+                flash('Check-in recorded successfully')
+        
+        elif action == 'check_out':
+            if today_attendance.empty:
+                flash('Member has not checked in today')
+            elif not pd.isna(today_attendance.iloc[0]['check_out']):
+                flash('Member has already checked out today')
+            else:
                 attendance_df.loc[
                     (attendance_df['date'] == today) & 
                     (attendance_df['member_id'].astype(str) == str(member_id)),
                     'check_out'
                 ] = current_time
                 flash('Check-out recorded successfully')
-            else:
-                flash('Member has already completed attendance for today')
         
         attendance_df.to_excel('data/attendance.xlsx', index=False)
     except Exception as e:
