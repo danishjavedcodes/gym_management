@@ -1,3 +1,8 @@
+<<<<<<< HEAD
 include data/*
 recursive-include templates *
+=======
+include data/*
+recursive-include templates *
+>>>>>>> 4cafcbef847ddc5abaa7bdb4415219c671c72116
 recursive-include static *
