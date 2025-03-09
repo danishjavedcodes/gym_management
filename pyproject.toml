@@ -1,8 +1,15 @@
-<<<<<<< HEAD
 [build-system]
-requires = ["setuptools>=45", "wheel"]
-=======
-[build-system]
-requires = ["setuptools>=45", "wheel"]
->>>>>>> 4cafcbef847ddc5abaa7bdb4415219c671c72116
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "gym-management"
+version = "1.0.0"
+description = "Gym Management System"
+requires-python = ">=3.8"
+dependencies = [
+    "Flask",
+    "pandas",
+    "openpyxl",
+    "gunicorn"
+]
