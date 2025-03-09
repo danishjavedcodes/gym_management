@@ -193,17 +193,17 @@ def edit_member(member_id):
         packages_df = pd.read_excel('data/packages.xlsx')
         
         if request.method == 'POST':
-            members_df.loc[members_df['id'] == member_id, 'name'] = request.form.get('name')
-            members_df.loc[members_df['id'] == member_id, 'address'] = request.form.get('address')
-            members_df.loc[members_df['id'] == member_id, 'package'] = request.form.get('package')
-            members_df.loc[members_df['id'] == member_id, 'weight'] = float(request.form.get('weight'))
-            members_df.loc[members_df['id'] == member_id, 'height'] = float(request.form.get('height'))
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'name'] = request.form.get('name')
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'address'] = request.form.get('address')
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'package'] = request.form.get('package')
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'weight'] = float(request.form.get('weight'))
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'height'] = float(request.form.get('height'))
             
             members_df.to_excel('data/members.xlsx', index=False)
             flash('Member updated successfully')
             return redirect(url_for('view_members'))
         
-        member = members_df[members_df['id'] == member_id].iloc[0]
+        member = members_df[members_df['id'].astype(str) == str(member_id)].iloc[0]
         return render_template('edit_member.html', 
                              member=member.to_dict(),
                              packages=packages_df.to_dict('records'))
@@ -211,6 +211,22 @@ def edit_member(member_id):
         app.logger.error(f"Error editing member: {e}")
         flash('Error updating member')
         return redirect(url_for('view_members'))
+
+@app.route('/members/delete/<member_id>')
+def delete_member(member_id):
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        members_df = pd.read_excel('data/members.xlsx')
+        members_df = members_df[members_df['id'].astype(str) != str(member_id)]
+        members_df.to_excel('data/members.xlsx', index=False)
+        flash('Member deleted successfully')
+    except Exception as e:
+        app.logger.error(f"Error deleting member: {e}")
+        flash('Error deleting member')
+    
+    return redirect(url_for('view_members'))
 
 # Attendance routes
 @app.route('/attendance')

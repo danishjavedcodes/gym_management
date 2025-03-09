@@ -1,0 +1,3 @@
+[console_scripts]
+toml-validator=toml_validator.__main__:main
+
