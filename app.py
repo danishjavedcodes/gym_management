@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import os
 import logging
 import calendar
+import json  # Add this import
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Changed secret key
@@ -15,6 +16,7 @@ logging.basicConfig(level=logging.DEBUG)
 if not os.path.exists('data'):
     os.makedirs('data')
 
+# Add this to your init_excel_files function
 def init_excel_files():
     excel_files = {
         'members.xlsx': {
@@ -37,11 +39,22 @@ def init_excel_files():
             'package': [], 'amount': [], 'status': []
         },
         'receptionists.xlsx': {
-            'username': [], 'password': [], 'name': []
+            'username': [], 'password': [], 'name': [], 'phone': [], 
+            'address': [], 'dob': [], 'age': [], 'gender': [], 
+            'salary': [], 'next_of_kin_name': [], 'next_of_kin_phone': [],
+            'privileges': []
         },
         'attendance.xlsx': {
             'date': [], 'member_id': [], 'member_name': [], 
             'check_in': [], 'check_out': []  # Added check_out
+        },
+        'inventory.xlsx': {
+            'id': [], 'stock_type': [], 'servings': [], 'cost_per_serving': [],
+            'profit_per_serving': [], 'other_charges': [], 'date_added': []
+        },
+        'sales.xlsx': {
+            'date': [], 'member_id': [], 'member_name': [], 'inventory_id': [], 
+            'item_name': [], 'quantity': [], 'total_amount': [], 'payment_method': []
         }
     }
     
@@ -72,20 +85,43 @@ def login_post():
         session['username'] = 'admin'
         return redirect(url_for('admin_dashboard'))
     
-    receptionists = pd.read_excel('data/receptionists.xlsx')
-    receptionist = receptionists[
-        (receptionists['username'] == username) & 
-        (receptionists['password'] == password)
-    ]
+    try:
+        receptionists = pd.read_excel('data/receptionists.xlsx')
+        receptionist = receptionists[
+            (receptionists['username'] == username) & 
+            (receptionists['password'] == password)
+        ]
+        
+        if not receptionist.empty:
+            session.permanent = True
+            session['user_type'] = 'staff'
+            session['username'] = username
+            # Safely handle privileges
+            privileges_str = receptionist.iloc[0]['privileges']
+            session['privileges'] = privileges_str.split(',') if isinstance(privileges_str, str) else []
+            return redirect(url_for('staff_dashboard'))
+        
+        flash('Invalid credentials')
+    except Exception as e:
+        app.logger.error(f"Login error: {e}")
+        flash('Error during login')
     
-    if not receptionist.empty:
-        session.permanent = True
-        session['user_type'] = 'receptionist'
-        session['username'] = username
-        return redirect(url_for('receptionist_dashboard'))
-    
-    flash('Invalid credentials')
     return redirect(url_for('login'))
+
+@app.route('/staff/dashboard')
+def staff_dashboard():
+    if 'user_type' not in session or session['user_type'] != 'staff':
+        return redirect(url_for('login'))
+    
+    try:
+        receptionists_df = pd.read_excel('data/receptionists.xlsx')
+        staff = receptionists_df[receptionists_df['username'] == session['username']].iloc[0]
+        privileges = session.get('privileges', [])
+        return render_template('staff/dashboard.html', staff_name=staff['name'], privileges=privileges)
+    except Exception as e:
+        app.logger.error(f"Error loading staff dashboard: {e}")
+        flash('Error loading dashboard')
+        return redirect(url_for('login'))
 
 @app.route('/logout')
 def logout():
@@ -257,8 +293,11 @@ def mark_attendance():
         attendance_df = pd.read_excel('data/attendance.xlsx')
         members_df = pd.read_excel('data/members.xlsx')
         
+        # Ensure check_out column exists
+        if 'check_out' not in attendance_df.columns:
+            attendance_df['check_out'] = None
+        
         member_id = request.form.get('member_id')
-        action = request.form.get('action')
         member_query = members_df[members_df['id'].astype(str) == str(member_id)]
         
         if member_query.empty:
@@ -269,37 +308,34 @@ def mark_attendance():
         today = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H:%M:%S')
         
+        # Check if member has already checked in today
         today_attendance = attendance_df[
             (attendance_df['date'] == today) & 
             (attendance_df['member_id'].astype(str) == str(member_id))
         ]
         
-        if action == 'check_in':
-            if not today_attendance.empty:
-                flash('Member has already checked in today')
-            else:
-                new_attendance = {
-                    'date': today,
-                    'member_id': str(member_id),
-                    'member_name': member['name'],
-                    'check_in': current_time,
-                    'check_out': None
-                }
-                attendance_df = pd.concat([attendance_df, pd.DataFrame([new_attendance])], ignore_index=True)
-                flash('Check-in recorded successfully')
-        
-        elif action == 'check_out':
-            if today_attendance.empty:
-                flash('Member has not checked in today')
-            elif not pd.isna(today_attendance.iloc[0]['check_out']):
-                flash('Member has already checked out today')
-            else:
+        if today_attendance.empty:
+            # Check in
+            new_attendance = {
+                'date': today,
+                'member_id': str(member_id),
+                'member_name': member['name'],
+                'check_in': current_time,
+                'check_out': None
+            }
+            attendance_df = pd.concat([attendance_df, pd.DataFrame([new_attendance])], ignore_index=True)
+            flash('Check-in recorded successfully')
+        else:
+            # Check out
+            if pd.isna(today_attendance.iloc[0]['check_out']):
                 attendance_df.loc[
                     (attendance_df['date'] == today) & 
                     (attendance_df['member_id'].astype(str) == str(member_id)),
                     'check_out'
                 ] = current_time
                 flash('Check-out recorded successfully')
+            else:
+                flash('Member has already completed attendance for today')
         
         attendance_df.to_excel('data/attendance.xlsx', index=False)
     except Exception as e:
@@ -422,6 +458,8 @@ def add_payment():
     return redirect(url_for('payments'))
 
 # Receptionist management routes
+# Remove the entire manage_staff route and function
+
 @app.route('/admin/receptionists')
 def manage_receptionists():
     if 'user_type' not in session or session['user_type'] != 'admin':
@@ -429,12 +467,11 @@ def manage_receptionists():
     
     try:
         receptionists_df = pd.read_excel('data/receptionists.xlsx')
-        return render_template('admin/receptionists.html',
-                             receptionists=receptionists_df.to_dict('records'))
+        return render_template('admin/receptionists.html', receptionists=receptionists_df.to_dict('records'))
     except Exception as e:
-        app.logger.error(f"Error loading receptionists: {e}")
-        flash('Error loading receptionists')
-        return redirect(url_for('admin_dashboard'))
+        app.logger.error(f"Error loading staff data: {e}")
+        flash('Error loading staff data')
+        return redirect(url_for('admin_dashboard'))  # Changed from 'dashboard' to 'admin_dashboard'
 
 @app.route('/admin/receptionists/add', methods=['POST'])
 def add_receptionist():
@@ -443,10 +480,23 @@ def add_receptionist():
     
     try:
         receptionists_df = pd.read_excel('data/receptionists.xlsx')
+        
+        # Get privileges as a list
+        privileges = request.form.getlist('privileges[]')
+        
         new_receptionist = {
             'username': request.form.get('username'),
             'password': request.form.get('password'),
-            'name': request.form.get('name')
+            'name': request.form.get('name'),
+            'phone': request.form.get('phone'),
+            'address': request.form.get('address'),
+            'dob': request.form.get('dob'),
+            'age': request.form.get('age'),
+            'gender': request.form.get('gender'),
+            'salary': request.form.get('salary'),
+            'next_of_kin_name': request.form.get('next_of_kin_name'),
+            'next_of_kin_phone': request.form.get('next_of_kin_phone'),
+            'privileges': ','.join(privileges) if privileges else ''
         }
         
         if new_receptionist['username'] in receptionists_df['username'].values:
@@ -455,10 +505,41 @@ def add_receptionist():
             receptionists_df = pd.concat([receptionists_df, pd.DataFrame([new_receptionist])], 
                                        ignore_index=True)
             receptionists_df.to_excel('data/receptionists.xlsx', index=False)
-            flash('Receptionist added successfully')
+            flash('Staff member added successfully')
     except Exception as e:
-        app.logger.error(f"Error adding receptionist: {e}")
-        flash('Error adding receptionist')
+        app.logger.error(f"Error adding staff member: {e}")
+        flash('Error adding staff member')
+    
+    return redirect(url_for('manage_receptionists'))
+
+@app.route('/admin/receptionists/edit/<username>', methods=['POST'])
+def edit_receptionist(username):
+    if 'user_type' not in session or session['user_type'] != 'admin':
+        return redirect(url_for('login'))
+    
+    try:
+        receptionists_df = pd.read_excel('data/receptionists.xlsx')
+        
+        # Get privileges as a list
+        privileges = request.form.getlist('privileges[]')
+        
+        # Update staff member details
+        receptionists_df.loc[receptionists_df['username'] == username, 'name'] = request.form.get('name')
+        receptionists_df.loc[receptionists_df['username'] == username, 'phone'] = request.form.get('phone')
+        receptionists_df.loc[receptionists_df['username'] == username, 'address'] = request.form.get('address')
+        receptionists_df.loc[receptionists_df['username'] == username, 'dob'] = request.form.get('dob')
+        receptionists_df.loc[receptionists_df['username'] == username, 'age'] = request.form.get('age')
+        receptionists_df.loc[receptionists_df['username'] == username, 'gender'] = request.form.get('gender')
+        receptionists_df.loc[receptionists_df['username'] == username, 'salary'] = request.form.get('salary')
+        receptionists_df.loc[receptionists_df['username'] == username, 'next_of_kin_name'] = request.form.get('next_of_kin_name')
+        receptionists_df.loc[receptionists_df['username'] == username, 'next_of_kin_phone'] = request.form.get('next_of_kin_phone')
+        receptionists_df.loc[receptionists_df['username'] == username, 'privileges'] = ','.join(privileges) if privileges else ''
+        
+        receptionists_df.to_excel('data/receptionists.xlsx', index=False)
+        flash('Staff member updated successfully')
+    except Exception as e:
+        app.logger.error(f"Error updating staff member: {e}")
+        flash('Error updating staff member')
     
     return redirect(url_for('manage_receptionists'))
 
@@ -577,5 +658,271 @@ def reports():
         flash('Error generating reports')
         return redirect(url_for('login'))
 
+# Inventory management routes
+@app.route('/inventory')
+def inventory():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        inventory_df = pd.read_excel('data/inventory.xlsx')
+        return render_template('inventory.html', inventory=inventory_df.to_dict('records'))
+    except Exception as e:
+        app.logger.error(f"Error reading inventory file: {e}")
+        flash('Error loading inventory data')
+        return redirect(url_for('login'))
+
+@app.route('/inventory/add', methods=['POST'])
+def add_inventory():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        inventory_df = pd.read_excel('data/inventory.xlsx')
+        new_item = {
+            'id': str(len(inventory_df) + 1),
+            'stock_type': request.form.get('stock_type'),
+            'servings': int(request.form.get('servings')),
+            'cost_per_serving': float(request.form.get('cost_per_serving')),
+            'profit_per_serving': float(request.form.get('profit_per_serving')),
+            'other_charges': float(request.form.get('other_charges')),
+            'date_added': datetime.now().strftime('%Y-%m-%d')
+        }
+        
+        inventory_df = pd.concat([inventory_df, pd.DataFrame([new_item])], ignore_index=True)
+        inventory_df.to_excel('data/inventory.xlsx', index=False)
+        flash('Inventory item added successfully')
+    except Exception as e:
+        app.logger.error(f"Error adding inventory item: {e}")
+        flash('Error adding inventory item')
+    
+    return redirect(url_for('inventory'))
+
+@app.route('/inventory/edit/<item_id>', methods=['GET', 'POST'])
+def edit_inventory(item_id):
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        inventory_df = pd.read_excel('data/inventory.xlsx')
+        
+        if request.method == 'POST':
+            inventory_df.loc[inventory_df['id'].astype(str) == str(item_id), 'stock_type'] = request.form.get('stock_type')
+            inventory_df.loc[inventory_df['id'].astype(str) == str(item_id), 'servings'] = int(request.form.get('servings'))
+            inventory_df.loc[inventory_df['id'].astype(str) == str(item_id), 'cost_per_serving'] = float(request.form.get('cost_per_serving'))
+            inventory_df.loc[inventory_df['id'].astype(str) == str(item_id), 'profit_per_serving'] = float(request.form.get('profit_per_serving'))
+            inventory_df.loc[inventory_df['id'].astype(str) == str(item_id), 'other_charges'] = float(request.form.get('other_charges'))
+            
+            inventory_df.to_excel('data/inventory.xlsx', index=False)
+            flash('Inventory item updated successfully')
+            return redirect(url_for('inventory'))
+        
+        item = inventory_df[inventory_df['id'].astype(str) == str(item_id)].iloc[0]
+        return render_template('edit_inventory.html', item=item.to_dict())
+    except Exception as e:
+        app.logger.error(f"Error editing inventory item: {e}")
+        flash('Error updating inventory item')
+        return redirect(url_for('inventory'))
+
+@app.route('/inventory/delete/<item_id>')
+def delete_inventory(item_id):
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        inventory_df = pd.read_excel('data/inventory.xlsx')
+        inventory_df = inventory_df[inventory_df['id'].astype(str) != str(item_id)]
+        inventory_df.to_excel('data/inventory.xlsx', index=False)
+        flash('Inventory item deleted successfully')
+    except Exception as e:
+        app.logger.error(f"Error deleting inventory item: {e}")
+        flash('Error deleting inventory item')
+    
+    return redirect(url_for('inventory'))
+
+# Sales management routes
+@app.route('/sales')
+def sales():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        sales_df = pd.read_excel('data/sales.xlsx')
+        # Sort sales by date in descending order
+        sales_df = sales_df.sort_values(by='date', ascending=False)
+        inventory_df = pd.read_excel('data/inventory.xlsx')
+        
+        # Get current user info
+        current_user = {
+            'username': session['username'],
+            'name': 'Admin' if session['user_type'] == 'admin' else None
+        }
+        
+        # If not admin, get receptionist name
+        if session['user_type'] != 'admin':
+            staff_df = pd.read_excel('data/receptionists.xlsx')
+            staff = staff_df[staff_df['username'] == session['username']].iloc[0]
+            current_user['name'] = staff['name']
+        
+        return render_template('sales.html',
+                             sales=sales_df.to_dict('records'),
+                             current_user=current_user,
+                             inventory=inventory_df.to_dict('records'))
+    except Exception as e:
+        app.logger.error(f"Error loading sales data: {e}")
+        flash('Error loading sales data')
+        return redirect(url_for('login'))
+
+@app.route('/sales/add', methods=['POST'])
+def add_sale():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        sales_df = pd.read_excel('data/sales.xlsx')
+        inventory_df = pd.read_excel('data/inventory.xlsx')
+        
+        # Use logged-in user's information
+        staff_username = session['username']
+        staff_name = 'Admin' if session['user_type'] == 'admin' else None
+        
+        # Get receptionist name if not admin
+        if session['user_type'] != 'admin':
+            staff_df = pd.read_excel('data/receptionists.xlsx')
+            staff = staff_df[staff_df['username'] == staff_username].iloc[0]
+            staff_name = staff['name']
+        
+        payment_method = request.form.get('payment_method')
+        total_amount = float(request.form.get('total_amount'))
+        selected_items_json = request.form.get('selected_items')
+        
+        if not selected_items_json:
+            flash('No items selected')
+            return redirect(url_for('sales'))
+            
+        selected_items = json.loads(selected_items_json)
+        
+        # Prepare items description and detailed information
+        items_description = []
+        items_details = []
+        
+        # Process each selected item
+        for selected_item in selected_items:
+            item_id = selected_item['id']
+            quantity = selected_item['quantity']
+            
+            # Get item details
+            item_rows = inventory_df[inventory_df['id'].astype(str) == str(item_id)]
+            if item_rows.empty:
+                flash(f'Item with ID {item_id} not found')
+                return redirect(url_for('sales'))
+                
+            item = item_rows.iloc[0]
+            
+            # Calculate item total
+            item_price = float(item['cost_per_serving']) + float(item['profit_per_serving'])
+            item_total = item_price * quantity
+            
+            # Add to items description
+            items_description.append(f"{item['stock_type']} ({quantity})")
+            
+            # Add detailed item information
+            items_details.append({
+                'name': item['stock_type'],
+                'quantity': quantity,
+                'price': item_price,
+                'total': item_total
+            })
+            
+            # Update inventory (reduce servings)
+            remaining_servings = int(item['servings']) - quantity
+            if remaining_servings < 0:
+                flash(f'Not enough servings available for {item["stock_type"]}')
+                return redirect(url_for('sales'))
+            
+            inventory_df.loc[inventory_df['id'].astype(str) == str(item_id), 'servings'] = remaining_servings
+        
+        # Save updated inventory
+        inventory_df.to_excel('data/inventory.xlsx', index=False)
+        
+        # Record the sale with detailed information
+        new_sale = {
+            'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'staff_username': staff_username,
+            'staff_name': staff_name,
+            'items': ', '.join(items_description),
+            'items_details': json.dumps(items_details),  # Store detailed information as JSON
+            'total_amount': total_amount,
+            'payment_method': payment_method
+        }
+        
+        sales_df = pd.concat([sales_df, pd.DataFrame([new_sale])], ignore_index=True)
+        sales_df.to_excel('data/sales.xlsx', index=False)
+        
+        flash('Sale recorded successfully')
+    except Exception as e:
+        app.logger.error(f"Error recording sale: {e}")
+        flash(f'Error recording sale: {str(e)}')
+    
+    return redirect(url_for('sales'))
+
+@app.route('/sales/report')
+def sales_report():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        sales_df = pd.read_excel('data/sales.xlsx')
+        
+        # Get date range from query parameters or use current date
+        start_date = request.args.get('start_date', datetime.now().strftime('%Y-%m-%d'))
+        end_date = request.args.get('end_date', datetime.now().strftime('%Y-%m-%d'))
+        
+        # Filter sales by date range
+        filtered_sales = sales_df[
+            (sales_df['date'].astype(str) >= start_date) & 
+            (sales_df['date'].astype(str) <= end_date)
+        ]
+        
+        # Process sales data for report
+        report_data = []
+        total_amount = 0
+        
+        for _, sale in filtered_sales.iterrows():
+            if sale['items_details']:
+                items = json.loads(sale['items_details'])
+                for item in items:
+                    report_data.append({
+                        'date': sale['date'],
+                        'product': item['name'],
+                        'quantity': item['quantity'],
+                        'price': item['price'],
+                        'total': item['total']
+                    })
+                    total_amount += item['total']
+        
+        return render_template('sales_report.html',
+                             report_data=report_data,
+                             total_amount=total_amount,
+                             start_date=start_date,
+                             end_date=end_date)
+    except Exception as e:
+        app.logger.error(f"Error generating sales report: {e}")
+        flash('Error generating sales report')
+        return redirect(url_for('sales'))
+
+
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+# Move the API endpoint before the if __name__ == '__main__' line
+@app.route('/api/inventory')
+def api_inventory():
+    try:
+        inventory_df = pd.read_excel('data/inventory.xlsx')
+        inventory_data = inventory_df.to_dict('records')
+        return json.dumps(inventory_data)
+    except Exception as e:
+        app.logger.error(f"Error fetching inventory data: {e}")
+        return json.dumps([])

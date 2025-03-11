@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin Dashboard{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-gray-800 text-white">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-4">
+                    <a href="{{ url_for('admin_dashboard') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Dashboard</a>
+                    <a href="{{ url_for('view_members') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Members</a>
+                    <a href="{{ url_for('packages') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Packages</a>
+                    <a href="{{ url_for('manage_receptionists') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Staff</a>
+                    <a href="{{ url_for('reports') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Reports</a>
+                    <a href="{{ url_for('inventory') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Inventory</a>
+                    <a href="{{ url_for('sales') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Sales</a>
+                </div>
+                <a href="{{ url_for('logout') }}" class="hover:bg-red-600 bg-red-500 px-3 py-2 rounded">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto py-6 px-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

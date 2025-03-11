@@ -1,0 +1,580 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-2xl font-bold">Inventory Sales</h2>
+        <div>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+    
+    <!-- Record New Sale Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Record New Sale</h4>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('add_sale') }}" method="post" id="saleForm">
+                <div class="mb-3">
+                    <label class="form-label">Staff</label>
+                    <input type="text" class="form-control" value="{{ current_user.name }}" readonly>
+                    <input type="hidden" name="staff_username" value="{{ current_user.username }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="payment_method">Payment Method</label>
+                    <select class="form-control" id="payment_method" name="payment_method" required>
+                        <option value="Cash">Cash</option>
+                        <option value="Card">Card</option>
+                        <option value="Online Transfer">Online Transfer</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_amount">Total Amount (₹)</label>
+                    <input type="number" step="0.01" class="form-control" id="total_amount" name="total_amount" readonly>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <label for="item_select">Select Item</label>
+                    <select class="form-control" id="item_select">
+                        <option value="">-- Select an item to add --</option>
+                        {% for item in inventory %}
+                        <option value="{{ item.id }}" 
+                                data-name="{{ item.stock_type }}"
+                                data-price="{{ item.cost_per_serving + item.profit_per_serving }}"
+                                data-max="{{ item.servings }}">
+                            {{ item.stock_type }} - ₹{{ item.cost_per_serving + item.profit_per_serving }}/serving ({{ item.servings }} available)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="item_quantity">Quantity</label>
+                    <input type="number" class="form-control" id="item_quantity" min="1" value="1">
+                </div>
+                <div class="col-md-2">
+                    <label>&nbsp;</label>
+                    <button type="button" class="btn btn-success form-control" id="add_item_btn">Add Item</button>
+                </div>
+            </div>
+            
+            <div class="table-responsive mb-3">
+                <table class="table table-striped" id="selected_items_table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Price/Serving</th>
+                            <th>Quantity</th>
+                            <th>Subtotal</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr id="no_items_row">
+                            <td colspan="5" class="text-center">No items selected</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <input type="hidden" id="selected_items" name="selected_items" value="">
+            <button type="submit" class="btn btn-primary mt-3">Record Sale</button>
+        </form>
+    </div>
+    
+    <!-- Sales History Table -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h4>Sales History</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Staff</th>
+                            <!-- Removed the Items column -->
+                            <th>Amount</th>
+                            <th>Payment Method</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sale in sales %}
+                        <tr>
+                            <td>{{ sale.date }}</td>
+                            <td>{{ sale.staff_name }}</td>
+                            <!-- Removed the Items cell -->
+                            <td>₹{{ sale.total_amount }}</td>
+                            <td>{{ sale.payment_method }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary view-receipt" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#receiptModal"
+                                        data-date="{{ sale.date }}"
+                                        data-staff="{{ sale.staff_name }}"
+                                        data-items="{{ sale.items }}"
+                                        data-amount="{{ sale.total_amount }}"
+                                        data-payment="{{ sale.payment_method }}"
+                                        data-items-details="{{ sale.items_details }}">
+                                    View Receipt
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Receipt Modal -->
+                <div class="modal fade" id="receiptModal" tabindex="-1" role="dialog" aria-labelledby="receiptModalLabel" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="receiptModalLabel">Sale Receipt</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="receipt-content">
+                                    <div class="text-center mb-3">
+                                        <h4>GYM Sales Receipt</h4>
+                                        <p class="mb-0">Date: <span id="receipt-date"></span></p>
+                                    </div>
+                                    <hr>
+                                    <div class="row mb-2">
+                                        <div class="col-6 font-weight-bold">Staff:</div>
+                                        <div class="col-6" id="receipt-staff"></div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-6 font-weight-bold">Payment Method:</div>
+                                        <div class="col-6" id="receipt-payment"></div>
+                                    </div>
+                                    <hr>
+                                    <h6 class="font-weight-bold">Items:</h6>
+                                    <div class="table-responsive mb-3">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Item</th>
+                                                    <th>Price/Serving</th>
+                                                    <th>Quantity</th>
+                                                    <th class="text-end">Subtotal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="receipt-items-table">
+                                                <!-- Items will be inserted here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <hr>
+                                    <div class="row font-weight-bold">
+                                        <div class="col-6">Total Amount:</div>
+                                        <div class="col-6 text-right" id="receipt-amount"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" id="print-receipt">Print Receipt</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const itemSelect = document.getElementById('item_select');
+        const itemQuantity = document.getElementById('item_quantity');
+        const addItemBtn = document.getElementById('add_item_btn');
+        const selectedItemsTable = document.getElementById('selected_items_table').querySelector('tbody');
+        const noItemsRow = document.getElementById('no_items_row');
+        const totalAmountInput = document.getElementById('total_amount');
+        const selectedItemsInput = document.getElementById('selected_items');
+        const saleForm = document.getElementById('saleForm');
+        
+        // Store selected items
+        const selectedItems = [];
+        
+        // Add item to the selected items list
+        addItemBtn.addEventListener('click', function() {
+            const selectedOption = itemSelect.options[itemSelect.selectedIndex];
+            if (!selectedOption.value) {
+                alert('Please select an item');
+                return;
+            }
+            
+            const itemId = selectedOption.value;
+            const itemName = selectedOption.dataset.name;
+            const itemPrice = parseFloat(selectedOption.dataset.price);
+            const maxQuantity = parseInt(selectedOption.dataset.max);
+            let quantity = parseInt(itemQuantity.value) || 1;
+            
+            // Validate quantity
+            if (quantity < 1) {
+                quantity = 1;
+                itemQuantity.value = 1;
+            }
+            if (quantity > maxQuantity) {
+                quantity = maxQuantity;
+                itemQuantity.value = maxQuantity;
+                alert(`Only ${maxQuantity} servings available for ${itemName}`);
+            }
+            
+            // Check if item already exists in the list
+            const existingItemIndex = selectedItems.findIndex(item => item.id === itemId);
+            if (existingItemIndex !== -1) {
+                // Update quantity if item already exists
+                const existingItem = selectedItems[existingItemIndex];
+                const newQuantity = existingItem.quantity + quantity;
+                
+                if (newQuantity > maxQuantity) {
+                    alert(`Cannot add more. You already have ${existingItem.quantity} of ${itemName} in your cart.`);
+                    return;
+                }
+                
+                existingItem.quantity = newQuantity;
+                existingItem.subtotal = newQuantity * itemPrice;
+                
+                // Update the table row
+                const rows = selectedItemsTable.querySelectorAll('tr[data-id]');
+                for (let row of rows) {
+                    if (row.dataset.id === itemId) {
+                        const quantityCell = row.querySelector('.item-quantity');
+                        const subtotalCell = row.querySelector('.item-subtotal');
+                        
+                        quantityCell.textContent = newQuantity;
+                        subtotalCell.textContent = `₹${existingItem.subtotal.toFixed(2)}`;
+                        break;
+                    }
+                }
+            } else {
+                // Add new item
+                const subtotal = quantity * itemPrice;
+                const newItem = {
+                    id: itemId,
+                    name: itemName,
+                    price: itemPrice,
+                    quantity: quantity,
+                    subtotal: subtotal,
+                    maxQuantity: maxQuantity
+                };
+                
+                selectedItems.push(newItem);
+                
+                // Hide "No items" row if this is the first item
+                if (selectedItems.length === 1) {
+                    noItemsRow.style.display = 'none';
+                }
+                
+                // Add new row to the table
+                const newRow = document.createElement('tr');
+                newRow.dataset.id = itemId;
+                newRow.innerHTML = `
+                    <td>${itemName}</td>
+                    <td>₹${itemPrice.toFixed(2)}</td>
+                    <td class="item-quantity">${quantity}</td>
+                    <td class="item-subtotal">₹${subtotal.toFixed(2)}</td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger remove-item" data-id="${itemId}">
+                            <i class="fas fa-trash"></i> Remove
+                        </button>
+                    </td>
+                `;
+                selectedItemsTable.appendChild(newRow);
+                
+                // Add event listener to the remove button
+                newRow.querySelector('.remove-item').addEventListener('click', function() {
+                    removeItem(this.dataset.id);
+                });
+            }
+            
+            // Reset selection
+            itemSelect.selectedIndex = 0;
+            itemQuantity.value = 1;
+            
+            // Update total
+            updateTotal();
+        });
+        
+        // Remove item from the selected items list
+        function removeItem(itemId) {
+            const index = selectedItems.findIndex(item => item.id === itemId);
+            if (index !== -1) {
+                selectedItems.splice(index, 1);
+                
+                // Remove row from table
+                const row = selectedItemsTable.querySelector(`tr[data-id="${itemId}"]`);
+                if (row) {
+                    row.remove();
+                }
+                
+                // Show "No items" row if no items left
+                if (selectedItems.length === 0) {
+                    noItemsRow.style.display = '';
+                }
+                
+                // Update total
+                updateTotal();
+            }
+        }
+        
+        // Update total amount
+        function updateTotal() {
+            let total = 0;
+            selectedItems.forEach(item => {
+                total += item.subtotal;
+            });
+            
+            totalAmountInput.value = total.toFixed(2);
+        }
+        
+        // Prepare selected items data before form submission
+        saleForm.addEventListener('submit', function(e) {
+            if (selectedItems.length === 0) {
+                e.preventDefault();
+                alert('Please select at least one item');
+                return;
+            }
+            
+            // Prepare data for submission - only include necessary fields
+            const itemsForSubmission = selectedItems.map(item => ({
+                id: item.id,
+                quantity: item.quantity
+            }));
+            
+            selectedItemsInput.value = JSON.stringify(itemsForSubmission);
+        });
+        
+        // Validate quantity input when item is selected
+        itemSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption.value) {
+                const maxQuantity = parseInt(selectedOption.dataset.max);
+                itemQuantity.max = maxQuantity;
+                
+                if (parseInt(itemQuantity.value) > maxQuantity) {
+                    itemQuantity.value = maxQuantity;
+                }
+            }
+        });
+        
+        // Receipt modal functionality
+        const receiptModal = document.getElementById('receiptModal');
+        const viewReceiptButtons = document.querySelectorAll('.view-receipt');
+        
+        viewReceiptButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const date = this.getAttribute('data-date');
+                const staff = this.getAttribute('data-staff');
+                const items = this.getAttribute('data-items');
+                const amount = this.getAttribute('data-amount');
+                const payment = this.getAttribute('data-payment');
+                const itemsDetails = this.getAttribute('data-items-details');
+                
+                document.getElementById('receipt-date').textContent = date;
+                document.getElementById('receipt-staff').textContent = staff;
+                document.getElementById('receipt-payment').textContent = payment;
+                document.getElementById('receipt-amount').textContent = '₹' + amount;
+                
+                // Parse items and create a table
+                const itemsTableBody = document.getElementById('receipt-items-table');
+                itemsTableBody.innerHTML = '';
+                
+                console.log("Raw items data:", items);
+                console.log("Raw items details:", itemsDetails);
+                
+                // Get inventory data for price lookup
+                const inventoryOptions = document.querySelectorAll('#item_select option');
+                const inventoryMap = {};
+                
+                // Create a map of inventory items for quick lookup
+                inventoryOptions.forEach(option => {
+                    if (option.value) {
+                        inventoryMap[option.value] = {
+                            name: option.dataset.name,
+                            price: parseFloat(option.dataset.price)
+                        };
+                    }
+                });
+                
+                // First try to parse itemsDetails if available
+                if (itemsDetails && itemsDetails.trim() !== '') {
+                    try {
+                        const parsedDetails = JSON.parse(itemsDetails);
+                        console.log("Successfully parsed items details:", parsedDetails);
+                        
+                        if (Array.isArray(parsedDetails)) {
+                            parsedDetails.forEach((item, index) => {
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td>${item.name}</td>
+                                    <td>₹${parseFloat(item.price).toFixed(2)}</td>
+                                    <td class="text-center">${item.quantity}</td>
+                                    <td class="text-end">₹${(parseFloat(item.price) * parseInt(item.quantity)).toFixed(2)}</td>
+                                `;
+                                itemsTableBody.appendChild(row);
+                            });
+                            
+                            // Add total row
+                            const totalRow = document.createElement('tr');
+                            totalRow.className = 'table-active';
+                            totalRow.innerHTML = `
+                                <td colspan="3" class="text-end fw-bold">Total:</td>
+                                <td class="text-end fw-bold">₹${amount}</td>
+                            `;
+                            itemsTableBody.appendChild(totalRow);
+                            return; // Exit if we successfully processed itemsDetails
+                        }
+                    } catch (e) {
+                        console.log("Error parsing itemsDetails JSON:", e);
+                    }
+                }
+                
+                // If we get here, try to parse the items data
+                try {
+                    // Try to parse as JSON first
+                    const parsedItems = JSON.parse(items);
+                    console.log("Successfully parsed items as JSON:", parsedItems);
+                    
+                    if (Array.isArray(parsedItems)) {
+                        parsedItems.forEach((item, index) => {
+                            // Find the item in inventory
+                            const inventoryItem = inventoryMap[item.id];
+                            
+                            if (inventoryItem) {
+                                const itemTotal = inventoryItem.price * item.quantity;
+                                
+                                // Create table row
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td>${inventoryItem.name}</td>
+                                    <td>₹${inventoryItem.price.toFixed(2)}</td>
+                                    <td class="text-center">${item.quantity}</td>
+                                    <td class="text-end">₹${itemTotal.toFixed(2)}</td>
+                                `;
+                                itemsTableBody.appendChild(row);
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.log("Error parsing JSON, trying string format:", e);
+                    
+                    // If JSON parsing fails, try the string format
+                    if (items && items.trim() !== '') {
+                        // Split by comma to get individual items
+                        const itemsList = items.split(',').map(item => item.trim());
+                        console.log("Items list from string:", itemsList);
+                        
+                        // Process each item
+                        itemsList.forEach((itemStr, index) => {
+                            console.log("Processing item:", itemStr);
+                            
+                            // Extract item name and quantity using regex
+                            const match = itemStr.match(/(.*?)\s*\((\d+)\)/);
+                            
+                            if (match) {
+                                const itemName = match[1].trim();
+                                const quantity = parseInt(match[2]);
+                                
+                                console.log("Matched item:", itemName, "Quantity:", quantity);
+                                
+                                // Find the item price from inventory
+                                let itemPrice = 0;
+                                let foundItem = null;
+                                
+                                // Search through all inventory options
+                                for (const id in inventoryMap) {
+                                    if (inventoryMap[id].name === itemName) {
+                                        itemPrice = inventoryMap[id].price;
+                                        foundItem = inventoryMap[id];
+                                        break;
+                                    }
+                                }
+                                
+                                console.log("Found item:", foundItem);
+                                
+                                // Calculate total for this item
+                                const itemTotal = itemPrice * quantity;
+                                
+                                // Create table row
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td>${itemName}</td>
+                                    <td>₹${itemPrice.toFixed(2)}</td>
+                                    <td class="text-center">${quantity}</td>
+                                    <td class="text-end">₹${itemTotal.toFixed(2)}</td>
+                                `;
+                                itemsTableBody.appendChild(row);
+                            } else {
+                                console.log("No match found for item:", itemStr);
+                                
+                                // If no quantity pattern found, just display the item string
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td>${itemStr}</td>
+                                    <td>-</td>
+                                    <td class="text-center">1</td>
+                                    <td class="text-end">-</td>
+                                `;
+                                itemsTableBody.appendChild(row);
+                            }
+                        });
+                    }
+                }
+                
+                // Add total row
+                const totalRow = document.createElement('tr');
+                totalRow.className = 'table-active';
+                totalRow.innerHTML = `
+                    <td colspan="3" class="text-end fw-bold">Total:</td>
+                    <td class="text-end fw-bold">₹${amount}</td>
+                `;
+                itemsTableBody.appendChild(totalRow);
+            });
+        });
+        
+        // Print receipt functionality
+        document.getElementById('print-receipt').addEventListener('click', function() {
+            const receiptContent = document.querySelector('.receipt-content').innerHTML;
+            const printWindow = window.open('', '_blank');
+            
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>GYM Sales Receipt</title>
+                    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+                    <style>
+                        body { padding: 20px; }
+                        @media print {
+                            .no-print { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        ${receiptContent}
+                        <div class="text-center mt-4">
+                            <p>Thank you for your purchase!</p>
+                        </div>
+                    </div>
+                    <div class="no-print text-center mt-4">
+                        <button onclick="window.print()" class="btn btn-primary">Print</button>
+                        <button onclick="window.close()" class="btn btn-secondary ml-2">Close</button>
+                    </div>
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+        });
+    });
+</script>
+{% endblock %}

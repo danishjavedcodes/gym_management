@@ -23,23 +23,36 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('view_members') }}">Members</a>
                     </li>
-                    {% if session.user_type == 'admin' %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('packages') }}">Packages</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('manage_receptionists') }}">Receptionists</a>
-                    </li>
-                    {% endif %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('payments') }}">Payments</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('attendance') }}">Attendance</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('reports') }}">Reports</a>
-                    </li>
+                    <ul class="navbar-nav mr-auto">
+                        {% if session.user_type == 'admin' %}
+                        <li class="nav-item {% if request.path == '/admin/dashboard' %}active{% endif %}">
+                            <a class="nav-link" href="{{ url_for('admin_dashboard') }}">Dashboard</a>
+                        </li>
+                        <li class="nav-item {% if request.path == '/packages' %}active{% endif %}">
+                            <a class="nav-link" href="{{ url_for('packages') }}">Packages</a>
+                        </li>
+                        <li class="nav-item {% if request.path == '/inventory' %}active{% endif %}">
+                            <a class="nav-link" href="{{ url_for('inventory') }}">Inventory</a>
+                        </li>
+                        <!-- Find the navigation item that says "Receptionists" and change it to "Staff" -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('manage_receptionists') }}">
+                                <i class="..."></i>
+                                Staff  <!-- Changed from "Receptionists" -->
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('payments') }}">Payments</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('attendance') }}">Attendance</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('reports') }}">Reports</a>
+                        </li>
+                    </ul>
                 </ul>
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
@@ -66,7 +79,8 @@
         {% block content %}{% endblock %}
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Bootstrap 5 Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

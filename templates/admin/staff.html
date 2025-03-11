@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Staff Management</h2>
+    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addStaffModal">
+        Add New Staff Member
+    </button>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Type</th>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Permissions</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in staff %}
+                <tr>
+                    <td>{{ member.id }}</td>
+                    <td>{{ member.other_type if member.staff_type == 'others' else member.staff_type }}</td>
+                    <td>{{ member.name }}</td>
+                    <td>{{ member.username }}</td>
+                    <td>{{ member.permissions }}</td>
+                    <td>
+                        <a href="#" class="btn btn-primary btn-sm">Edit</a>
+                        <a href="#" class="btn btn-danger btn-sm">Delete</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Staff Modal -->
+<div class="modal fade" id="addStaffModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Staff Member</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('add_staff') }}" method="POST">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Staff Type</label>
+                            <select class="form-control" name="staff_type" id="staff_type" required onchange="toggleOtherType()">
+                                <option value="receptionist">Receptionist</option>
+                                <option value="trainer">Trainer</option>
+                                <option value="cleaner">Cleaner</option>
+                                <option value="manager">Manager</option>
+                                <option value="others">Others</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3" id="other_type_div" style="display: none;">
+                            <label class="form-label">Specify Other Type</label>
+                            <input type="text" class="form-control" name="other_type">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date of Birth</label>
+                            <input type="date" class="form-control" name="dob" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea class="form-control" name="address" required></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Medical Conditions</label>
+                            <textarea class="form-control" name="medical_conditions" required></textarea>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Next of Kin</label>
+                            <input type="text" class="form-control" name="next_of_kin" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" name="username" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" name="password" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Permissions</label>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_members" id="perm_members">
+                            <label class="form-check-label" for="perm_members">Members Management</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_attendance" id="perm_attendance">
+                            <label class="form-check-label" for="perm_attendance">Attendance Management</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_payments" id="perm_payments">
+                            <label class="form-check-label" for="perm_payments">Payments Management</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_packages" id="perm_packages">
+                            <label class="form-check-label" for="perm_packages">Packages Management</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_reports" id="perm_reports">
+                            <label class="form-check-label" for="perm_reports">Reports Access</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Add Staff Member</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleOtherType() {
+    const staffType = document.getElementById('staff_type').value;
+    const otherTypeDiv = document.getElementById('other_type_div');
+    otherTypeDiv.style.display = staffType === 'others' ? 'block' : 'none';
+}
+</script>
+{% endblock %}
