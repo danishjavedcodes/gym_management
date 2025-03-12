@@ -35,12 +35,14 @@
                     <td>{{ member.package }}</td>
                     <td>{{ member.payment_status if member.payment_status else 'Pending' }}</td>
                     <td>
-                        {% if not member.payment_status or member.payment_status == 'Pending' %}
+                        {% if member.payment_status != 'Paid' %}
                         <form action="{{ url_for('add_payment') }}" method="POST" class="d-inline">
                             <input type="hidden" name="member_id" value="{{ member.id }}">
-                            <input type="hidden" name="amount" value="{{ packages[member.package] if packages and member.package in packages else 0 }}">
-                            <button type="submit" class="btn btn-primary btn-sm">Record Payment</button>
+                            <input type="hidden" name="amount" value="{{ packages[member.package] }}">
+                            <button type="submit" class="btn btn-success btn-sm">Mark as Paid</button>
                         </form>
+                        {% else %}
+                        <span class="badge bg-success">Paid</span>
                         {% endif %}
                     </td>
                 </tr>

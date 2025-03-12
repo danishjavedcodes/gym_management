@@ -23,78 +23,33 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">GYM Management</a>
-            
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    {% if session.user_type == 'admin' %}
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto">
+                    {% if session.user_type == 'admin' or 'members' in session.get('privileges', []) %}
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/admin/dashboard' %}active{% endif %}" href="{{ url_for('admin_dashboard') }}">
-                            <i class="fas fa-tachometer-alt me-1"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/packages' %}active{% endif %}" href="{{ url_for('packages') }}">
-                            <i class="fas fa-box me-1"></i> Packages
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/inventory' %}active{% endif %}" href="{{ url_for('inventory') }}">
-                            <i class="fas fa-boxes me-1"></i> Inventory
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/manage_receptionists' %}active{% endif %}" href="{{ url_for('manage_receptionists') }}">
-                            <i class="fas fa-user-tie me-1"></i> Staff
-                        </a>
+                        <a class="nav-link" href="{{ url_for('view_members') }}">Members</a>
                     </li>
                     {% endif %}
+
+                    {% if session.user_type == 'admin' or 'member_attendance' in session.get('privileges', []) %}
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/members' %}active{% endif %}" href="{{ url_for('view_members') }}">
-                            <i class="fas fa-users me-1"></i> Members
-                        </a>
+                        <a class="nav-link" href="{{ url_for('attendance') }}">Attendance</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/sales' %}active{% endif %}" href="{{ url_for('sales') }}">
-                            <i class="fas fa-shopping-cart me-1"></i> Sales
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/payments' %}active{% endif %}" href="{{ url_for('payments') }}">
-                            <i class="fas fa-money-bill-wave me-1"></i> Payments
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/attendance' %}active{% endif %}" href="{{ url_for('attendance') }}">
-                            <i class="fas fa-calendar-check me-1"></i> Attendance
-                        </a>
-                    </li>
-                    <!-- Inside your navigation list -->
+                    {% endif %}
+
+                    {% if session.user_type == 'admin' or 'staff_attendance' in session.get('privileges', []) %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('staff_attendance') }}">Staff Attendance</a>
                     </li>
+                    {% endif %}
+
+                    {% if session.user_type == 'admin' or 'payments' in session.get('privileges', []) %}
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/reports' %}active{% endif %}" href="{{ url_for('reports') }}">
-                            <i class="fas fa-chart-bar me-1"></i> Reports
-                        </a>
-                    </li>
-                </ul>
-                <!-- User widget only -->
-                <ul class="navbar-nav">
-                    {% if session.username %}
-                    <li class="nav-item">
-                        <div class="user-widget text-light me-3">
-                            <i class="fas fa-user"></i>
-                            <span class="ms-2">{{ session.username }}</span>
-                            {% if session.user_type %}
-                            <span class="badge bg-secondary ms-2">{{ session.user_type }}</span>
-                            {% endif %}
-                        </div>
+                        <a class="nav-link" href="{{ url_for('payments') }}">Payments</a>
                     </li>
                     {% endif %}
                 </ul>
+                <span class="navbar-text me-3">{{ session.username }}</span>
             </div>
         </div>
     </nav>

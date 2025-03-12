@@ -100,9 +100,9 @@ def login_post():
             session.permanent = True
             session['user_type'] = 'staff'
             session['username'] = username
-            # Safely handle privileges
+            # Store privileges as a list
             privileges_str = receptionist.iloc[0]['privileges']
-            session['privileges'] = privileges_str.split(',') if isinstance(privileges_str, str) else []
+            session['privileges'] = privileges_str.split(',') if isinstance(privileges_str, str) and privileges_str else []
             return redirect(url_for('staff_dashboard'))
         
         flash('Invalid credentials')
@@ -111,6 +111,7 @@ def login_post():
         flash('Error during login')
     
     return redirect(url_for('login'))
+
 
 @app.route('/staff/dashboard')
 def staff_dashboard():
@@ -208,79 +209,22 @@ def view_members():
     if 'user_type' not in session:
         return redirect(url_for('login'))
     
+    # Check for both admin and staff with members privilege
+    if session['user_type'] != 'admin' and 'members' not in session.get('privileges', []):
+        flash('Access denied')
+        return redirect(url_for('staff_dashboard'))
+    
     try:
-        # Ensure data directory exists
-        os.makedirs('data', exist_ok=True)
-        
-        # Initialize or read members.xlsx
-        members_path = 'data/members.xlsx'
-        if not os.path.exists(members_path):
-            initial_members_df = pd.DataFrame({
-                'member_id': pd.Series(dtype='str'),
-                'name': pd.Series(dtype='str'),
-                'phone': pd.Series(dtype='str'),
-                'address': pd.Series(dtype='str'),
-                'dob': pd.Series(dtype='str'),
-                'age': pd.Series(dtype='str'),
-                'gender': pd.Series(dtype='str'),
-                'next_of_kin_name': pd.Series(dtype='str'),
-                'next_of_kin_phone': pd.Series(dtype='str'),
-                'package': pd.Series(dtype='str'),
-                'join_date': pd.Series(dtype='str'),
-                'expiry_date': pd.Series(dtype='str'),
-                'status': pd.Series(dtype='str')
-            })
-            initial_members_df.to_excel(members_path, index=False)
-            members_df = initial_members_df
-        else:
-            members_df = pd.read_excel(members_path, dtype=str)
-        
-        # Initialize or read packages.xlsx
-        packages_path = 'data/packages.xlsx'
-        if not os.path.exists(packages_path):
-            initial_packages_df = pd.DataFrame({
-                'name': pd.Series(dtype='str'),
-                'price': pd.Series(dtype='str'),
-                'trainers': pd.Series(dtype='str'),
-                'cardio_access': pd.Series(dtype='str'),
-                'timings': pd.Series(dtype='str'),
-                'duration': pd.Series(dtype='str')
-            })
-            initial_packages_df.to_excel(packages_path, index=False)
-            packages_df = initial_packages_df
-        else:
-            packages_df = pd.read_excel(packages_path, dtype=str)
-        
-        today = datetime.now().strftime('%Y-%m-%d')
-        
-        # Handle members data
-        members_records = []
-        if not members_df.empty:
-            members_df = members_df.fillna('')
-            members_df['status'] = members_df.apply(
-                lambda x: 'Active' if pd.notna(x['expiry_date']) and 
-                str(x['expiry_date']).strip() and 
-                pd.to_datetime(str(x['expiry_date'])) >= pd.to_datetime(today) 
-                else 'Expired', 
-                axis=1
-            )
-            members_records = members_df.to_dict('records')
-        
-        # Handle packages data
-        packages_records = []
-        if not packages_df.empty:
-            packages_df = packages_df.fillna('')
-            packages_records = packages_df.to_dict('records')
-        
+        members_df = pd.read_excel('data/members.xlsx')
+        packages_df = pd.read_excel('data/packages.xlsx')
         return render_template('members.html', 
-                             members=members_records,
-                             packages=packages_records,
-                             today=today)
-                             
+                             members=members_df.to_dict('records'),
+                             packages=packages_df.to_dict('records'),
+                             user_type=session['user_type'])
     except Exception as e:
-        app.logger.error(f"Error in view_members: {str(e)}")
-        flash(f'Error loading data: {str(e)}')
-        return redirect(url_for('login'))
+        app.logger.error(f"Error loading members: {e}")
+        flash('Error loading members')
+        return redirect(url_for('staff_dashboard'))
 
 
 
@@ -382,30 +326,35 @@ def attendance():
     if 'user_type' not in session:
         return redirect(url_for('login'))
     
+    # Check for both admin and staff with member_attendance privilege
+    if session['user_type'] != 'admin' and 'member_attendance' not in session.get('privileges', []):
+        flash('Access denied')
+        return redirect(url_for('staff_dashboard'))
+    
     try:
         members_df = pd.read_excel('data/members.xlsx')
         attendance_df = pd.read_excel('data/attendance.xlsx')
-        staff_df = pd.read_excel('data/receptionists.xlsx')
-        staff_attendance_df = pd.read_excel('data/trainer_attendance.xlsx')
         
         today = datetime.now().strftime('%Y-%m-%d')
         today_attendance = attendance_df[attendance_df['date'] == today]
-        today_staff_attendance = staff_attendance_df[staff_attendance_df['date'] == today]
         
         return render_template('attendance.html',
                              members=members_df.to_dict('records'),
-                             attendance=today_attendance.to_dict('records'),
-                             staff=staff_df.to_dict('records'),
-                             staff_attendance=today_staff_attendance.to_dict('records'))
+                             attendance=today_attendance.to_dict('records'))
     except Exception as e:
-        app.logger.error(f"Error reading Excel files: {e}")
+        app.logger.error(f"Error loading attendance: {e}")
         flash('Error loading attendance data')
-        return redirect(url_for('login'))
+        return redirect(url_for('staff_dashboard'))
 
 @app.route('/staff_attendance')
 def staff_attendance():
     if 'user_type' not in session:
         return redirect(url_for('login'))
+    
+    # Check for both admin and staff with staff_attendance privilege
+    if session['user_type'] != 'admin' and 'staff_attendance' not in session.get('privileges', []):
+        flash('Access denied')
+        return redirect(url_for('staff_dashboard'))
     
     try:
         staff_df = pd.read_excel('data/receptionists.xlsx')
@@ -418,9 +367,11 @@ def staff_attendance():
                              staff=staff_df.to_dict('records'),
                              staff_attendance=today_staff_attendance.to_dict('records'))
     except Exception as e:
-        app.logger.error(f"Error reading Excel files: {e}")
+        app.logger.error(f"Error loading staff attendance: {e}")
         flash('Error loading staff attendance data')
-        return redirect(url_for('login'))
+        return redirect(url_for('staff_dashboard'))
+
+
 
 
 @app.route('/mark_staff_attendance', methods=['POST'])
@@ -604,17 +555,21 @@ def delete_package(name):
 
 # Payment management routes
 # Update the payments route to handle both GET and POST methods
-@app.route('/payments', methods=['GET', 'POST'])
+@app.route('/payments')
 def payments():
     if 'user_type' not in session:
         return redirect(url_for('login'))
+    
+    # Check for both admin and staff with payments privilege
+    if session['user_type'] != 'admin' and 'payments' not in session.get('privileges', []):
+        flash('Access denied')
+        return redirect(url_for('staff_dashboard'))
     
     try:
         payments_df = pd.read_excel('data/payments.xlsx')
         members_df = pd.read_excel('data/members.xlsx')
         packages_df = pd.read_excel('data/packages.xlsx')
         
-        # Create a dictionary of package prices
         packages = dict(zip(packages_df['name'], packages_df['price']))
         
         return render_template('payments.html',
@@ -624,7 +579,8 @@ def payments():
     except Exception as e:
         app.logger.error(f"Error loading payments: {e}")
         flash('Error loading payments')
-        return redirect(url_for('login'))
+        return redirect(url_for('staff_dashboard'))
+
 
 @app.route('/payments/add', methods=['POST'])
 def add_payment():

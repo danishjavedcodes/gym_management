@@ -20,13 +20,25 @@
         </div>
         {% endif %}
 
-        {% if 'attendance' in privileges %}
+        {% if 'member_attendance' in privileges %}
         <div class="col-md-4 mb-3">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">Attendance</h5>
-                    <p class="card-text">Today's Attendance: {{ dashboard_data.today_attendance }}</p>
-                    <a href="{{ url_for('attendance') }}" class="btn btn-primary">Manage Attendance</a>
+                    <h5 class="card-title">Member Attendance</h5>
+                    <p class="card-text">Today's Member Attendance: {{ dashboard_data.today_member_attendance }}</p>
+                    <a href="{{ url_for('attendance') }}" class="btn btn-primary">Manage Member Attendance</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if 'staff_attendance' in privileges %}
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Staff Attendance</h5>
+                    <p class="card-text">Today's Staff Attendance: {{ dashboard_data.today_staff_attendance }}</p>
+                    <a href="{{ url_for('staff_attendance') }}" class="btn btn-primary">Manage Staff Attendance</a>
                 </div>
             </div>
         </div>
