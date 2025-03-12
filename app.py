@@ -120,12 +120,35 @@ def staff_dashboard():
     try:
         receptionists_df = pd.read_excel('data/receptionists.xlsx')
         staff = receptionists_df[receptionists_df['username'] == session['username']].iloc[0]
-        privileges = session.get('privileges', [])
-        return render_template('staff/dashboard.html', staff_name=staff['name'], privileges=privileges)
+        privileges = staff['privileges'].split(',') if isinstance(staff['privileges'], str) else []
+        
+        # Get relevant data based on privileges
+        dashboard_data = {}
+        
+        if 'members' in privileges:
+            members_df = pd.read_excel('data/members.xlsx')
+            dashboard_data['total_members'] = len(members_df)
+        
+        if 'payments' in privileges:
+            payments_df = pd.read_excel('data/payments.xlsx')
+            today = datetime.now().strftime('%Y-%m-%d')
+            dashboard_data['today_payments'] = len(payments_df[payments_df['date'] == today])
+        
+        if 'attendance' in privileges:
+            attendance_df = pd.read_excel('data/attendance.xlsx')
+            today = datetime.now().strftime('%Y-%m-%d')
+            dashboard_data['today_attendance'] = len(attendance_df[attendance_df['date'] == today])
+        
+        return render_template('staff/dashboard.html', 
+                             staff_name=staff['name'],
+                             privileges=privileges,
+                             dashboard_data=dashboard_data)
+                             
     except Exception as e:
         app.logger.error(f"Error loading staff dashboard: {e}")
         flash('Error loading dashboard')
         return redirect(url_for('login'))
+
 
 @app.route('/logout')
 def logout():
