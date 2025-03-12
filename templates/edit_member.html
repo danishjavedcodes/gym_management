@@ -4,12 +4,20 @@
 <div class="container mx-auto px-4 py-8">
     <h2 class="text-2xl font-bold mb-6">Edit Member</h2>
     <form action="{{ url_for('edit_member', member_id=member.id) }}" method="POST" class="max-w-lg">
-        <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-bold mb-2">Name</label>
-            <input type="text" name="name" value="{{ member.name }}" class="form-control" required>
+        <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" class="form-control" name="name" value="{{ member.name }}" required>
         </div>
-        <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-bold mb-2">Address</label>
+        <div class="mb-3">
+            <label class="form-label">Gender</label>
+            <select class="form-control" name="gender" required>
+                <option value="Male" {% if member.gender == 'Male' %}selected{% endif %}>Male</option>
+                <option value="Female" {% if member.gender == 'Female' %}selected{% endif %}>Female</option>
+                <option value="Other" {% if member.gender == 'Other' %}selected{% endif %}>Other</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Date of Birth</label>
             <input type="text" name="address" value="{{ member.address }}" class="form-control" required>
         </div>
         <div class="mb-4">

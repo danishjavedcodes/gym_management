@@ -24,7 +24,8 @@ def init_excel_files():
             'member_id': [], 'name': [], 'phone': [], 'address': [], 
             'dob': [], 'age': [], 'gender': [], 
             'next_of_kin_name': [], 'next_of_kin_phone': [],
-            'package': [], 'join_date': [], 'expiry_date': [], 'status': []
+            'package': [], 'join_date': [], 'expiry_date': [], 'status': [],
+            'height': [], 'weight': []  # Added height and weight
         },
         'packages.xlsx': {
             'name': [], 'price': [], 'trainers': [], 
@@ -203,77 +204,78 @@ def receptionist_dashboard():
         return redirect(url_for('login'))
     return render_template('receptionist/dashboard.html')
 
-# Member management routes
+# @app.route('/view_members')
+# def view_members():
+#     if 'user_type' not in session:
+#         return redirect(url_for('login'))
+    
+#     if session['user_type'] != 'admin' and 'members' not in session.get('privileges', []):
+#         flash('Access denied')
+#         return redirect(url_for('staff_dashboard'))
+    
+#     try:
+#         # Read Excel files with proper error handling
+#         members_df = pd.read_excel('data/members.xlsx')
+#         if len(members_df) == 0:
+#             members_df = pd.DataFrame(columns=[
+#                 'member_id', 'name', 'phone', 'address', 'dob', 'age',
+#                 'gender', 'next_of_kin_name', 'next_of_kin_phone',
+#                 'package', 'join_date', 'expiry_date', 'status'
+#             ])
+        
+#         packages_df = pd.read_excel('data/packages.xlsx')
+#         if len(packages_df) == 0:
+#             packages_df = pd.DataFrame(columns=['name', 'price', 'duration'])
+        
+#         # Convert to records safely
+#         members_list = []
+#         for _, row in members_df.iterrows():
+#             member_dict = {}
+#             for column in row.index:
+#                 value = row[column]
+#                 # Ensure value is a string before calling split
+#                 if pd.isna(value):
+#                     member_dict[column] = ''
+#                 else:
+#                     member_dict[column] = str(value) if column != 'age' else int(value) if pd.notna(value) else 0
+#             members_list.append(member_dict)
+        
+#         packages_list = packages_df.replace({pd.NA: None}).to_dict('records')
+        
+#         return render_template('members.html', 
+#                              members=members_list,
+#                              packages=packages_list,
+#                              user_type=session['user_type'])
+#     except Exception as e:
+#         app.logger.error(f"Error loading members: {e}")
+#         flash('Error loading members')
+#         return redirect(url_for('staff_dashboard'))
 @app.route('/view_members')
 def view_members():
     if 'user_type' not in session:
         return redirect(url_for('login'))
     
-    # Check for both admin and staff with members privilege
-    if session['user_type'] != 'admin' and 'members' not in session.get('privileges', []):
-        flash('Access denied')
-        return redirect(url_for('staff_dashboard'))
+    if 'members' not in session.get('permissions', []) and session['user_type'] != 'admin':
+        flash('You do not have permission to view members')
+        return redirect(url_for('login'))
     
     try:
         members_df = pd.read_excel('data/members.xlsx')
         packages_df = pd.read_excel('data/packages.xlsx')
-        return render_template('members.html', 
-                             members=members_df.to_dict('records'),
-                             packages=packages_df.to_dict('records'),
-                             user_type=session['user_type'])
+        
+        # Convert members DataFrame to list of dictionaries for template
+        members = members_df.to_dict('records')
+        packages = packages_df['name'].tolist()
+        
+        return render_template('members.html',
+                             members=members,
+                             packages=packages,
+                             active_page='members')
     except Exception as e:
         app.logger.error(f"Error loading members: {e}")
-        flash('Error loading members')
-        return redirect(url_for('staff_dashboard'))
+        flash('Error loading members data')
+        return redirect(url_for('login'))
 
-
-
-@app.route('/members/add', methods=['POST'])
-def add_member():
-    try:
-        members_df = pd.read_excel('data/members.xlsx')
-        packages_df = pd.read_excel('data/packages.xlsx')
-        
-        # Generate 4-digit unique member ID
-        if len(members_df) == 0:
-            next_id = 1
-        else:
-            # Get the maximum ID and increment by 1
-            current_max = max([int(str(id).zfill(4)) for id in members_df['member_id']])
-            next_id = current_max + 1
-        member_id = str(next_id).zfill(4)  # Pad with zeros to make 4 digits
-        
-        # Get package duration and calculate expiry date
-        package_name = request.form.get('package')
-        package_duration = int(packages_df[packages_df['name'] == package_name]['duration'].iloc[0])
-        join_date = datetime.now().date()
-        expiry_date = join_date + timedelta(days=package_duration)
-        
-        new_member = {
-            'member_id': member_id,
-            'name': request.form.get('name'),
-            'phone': request.form.get('phone'),
-            'address': request.form.get('address'),
-            'dob': request.form.get('dob'),
-            'age': request.form.get('age'),
-            'gender': request.form.get('gender'),
-            'next_of_kin_name': request.form.get('next_of_kin_name'),
-            'next_of_kin_phone': request.form.get('next_of_kin_phone'),
-            'package': package_name,
-            'join_date': join_date.strftime('%Y-%m-%d'),
-            'expiry_date': expiry_date.strftime('%Y-%m-%d'),
-            'status': 'Active'
-        }
-        
-        members_df = pd.concat([members_df, pd.DataFrame([new_member])], ignore_index=True)
-        members_df.to_excel('data/members.xlsx', index=False)
-        flash('Member added successfully')
-        
-    except Exception as e:
-        app.logger.error(f"Error adding member: {e}")
-        flash('Error adding member')
-    
-    return redirect(url_for('view_members'))
 
 @app.route('/members/edit/<member_id>', methods=['GET', 'POST'])
 def edit_member(member_id):
@@ -286,7 +288,11 @@ def edit_member(member_id):
         
         if request.method == 'POST':
             members_df.loc[members_df['id'].astype(str) == str(member_id), 'name'] = request.form.get('name')
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'gender'] = request.form.get('gender')  # Add this line
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'dob'] = request.form.get('dob')
             members_df.loc[members_df['id'].astype(str) == str(member_id), 'address'] = request.form.get('address')
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'medical_conditions'] = request.form.get('medical_conditions')
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'next_of_kin'] = request.form.get('next_of_kin')
             members_df.loc[members_df['id'].astype(str) == str(member_id), 'package'] = request.form.get('package')
             members_df.loc[members_df['id'].astype(str) == str(member_id), 'weight'] = float(request.form.get('weight'))
             members_df.loc[members_df['id'].astype(str) == str(member_id), 'height'] = float(request.form.get('height'))
@@ -304,6 +310,7 @@ def edit_member(member_id):
         flash('Error updating member')
         return redirect(url_for('view_members'))
 
+
 @app.route('/members/delete/<member_id>')
 def delete_member(member_id):
     if 'user_type' not in session:
@@ -311,7 +318,23 @@ def delete_member(member_id):
     
     try:
         members_df = pd.read_excel('data/members.xlsx')
-        members_df = members_df[members_df['id'].astype(str) != str(member_id)]
+        
+        # Log the DataFrame before deletion for debugging
+        app.logger.debug(f"Members DataFrame before deletion:\n{members_df}")
+        
+        # Ensure the correct column name is used for filtering
+        if 'id' in members_df.columns:
+            members_df = members_df[members_df['id'].astype(str) != str(member_id)]
+        elif 'member_id' in members_df.columns:
+            members_df = members_df[members_df['member_id'].astype(str) != str(member_id)]
+        else:
+            flash('Member ID column not found')
+            return redirect(url_for('view_members'))
+        
+        # Log the DataFrame after deletion for debugging
+        app.logger.debug(f"Members DataFrame after deletion:\n{members_df}")
+        
+        # Save the updated DataFrame back to the Excel file
         members_df.to_excel('data/members.xlsx', index=False)
         flash('Member deleted successfully')
     except Exception as e:
@@ -319,6 +342,9 @@ def delete_member(member_id):
         flash('Error deleting member')
     
     return redirect(url_for('view_members'))
+
+
+
 
 # Attendance routes
 @app.route('/attendance')
@@ -537,6 +563,7 @@ def add_package():
         flash('Error adding package')
     
     return redirect(url_for('packages'))
+
 @app.route('/packages/delete/<name>')
 def delete_package(name):
     if 'user_type' not in session or session['user_type'] != 'admin':
@@ -544,7 +571,17 @@ def delete_package(name):
     
     try:
         packages_df = pd.read_excel('data/packages.xlsx')
+        
+        # Log the DataFrame before deletion for debugging
+        app.logger.debug(f"Packages DataFrame before deletion:\n{packages_df}")
+        
+        # Ensure the correct column name is used for filtering
         packages_df = packages_df[packages_df['name'] != name]
+        
+        # Log the DataFrame after deletion for debugging
+        app.logger.debug(f"Packages DataFrame after deletion:\n{packages_df}")
+        
+        # Save the updated DataFrame back to the Excel file
         packages_df.to_excel('data/packages.xlsx', index=False)
         flash('Package deleted successfully')
     except Exception as e:
@@ -552,6 +589,8 @@ def delete_package(name):
         flash('Error deleting package')
     
     return redirect(url_for('packages'))
+
+
 
 # Payment management routes
 # Update the payments route to handle both GET and POST methods
@@ -580,6 +619,51 @@ def payments():
         app.logger.error(f"Error loading payments: {e}")
         flash('Error loading payments')
         return redirect(url_for('staff_dashboard'))
+
+@app.route('/members/add', methods=['GET'])
+def add_member_page():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        packages_df = pd.read_excel('data/packages.xlsx')
+        return render_template('add_member.html', packages=packages_df.to_dict('records'))
+    except Exception as e:
+        app.logger.error(f"Error loading add member page: {e}")
+        flash('Error loading packages data')
+        return redirect(url_for('view_members'))
+
+@app.route('/members/add', methods=['POST'])
+def add_member():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        members_df = pd.read_excel('data/members.xlsx')
+        new_member = {
+            'id': str(len(members_df) + 1),
+            'name': request.form.get('name'),
+            'gender': request.form.get('gender'),
+            'dob': request.form.get('dob'),
+            'address': request.form.get('address'),
+            'medical_conditions': request.form.get('medical_conditions'),
+            'next_of_kin': request.form.get('next_of_kin'),
+            'package': request.form.get('package'),
+            'weight': float(request.form.get('weight')),
+            'height': float(request.form.get('height')),
+            'join_date': datetime.now().strftime('%Y-%m-%d'),
+            'payment_status': 'Pending'
+        }
+        
+        members_df = pd.concat([members_df, pd.DataFrame([new_member])], ignore_index=True)
+        members_df.to_excel('data/members.xlsx', index=False)
+        flash('Member added successfully')
+    except Exception as e:
+        app.logger.error(f"Error adding member: {e}")
+        flash('Error adding member')
+    
+    return redirect(url_for('view_members'))
+
 
 
 @app.route('/payments/add', methods=['POST'])
