@@ -692,12 +692,12 @@ def add_staff():
     try:
         receptionists_df = pd.read_excel('data/receptionists.xlsx')
         
-        # Get permissions as a list and join them
+        # Updated permissions list with separated attendance types
         permissions = []
         if request.form.get('perm_members'): permissions.append('members')
-        if request.form.get('perm_attendance'): permissions.append('attendance')
+        if request.form.get('perm_member_attendance'): permissions.append('member_attendance')
+        if request.form.get('perm_staff_attendance'): permissions.append('staff_attendance')
         if request.form.get('perm_payments'): permissions.append('payments')
-        if request.form.get('perm_packages'): permissions.append('packages')
         if request.form.get('perm_reports'): permissions.append('reports')
         
         new_staff = {
