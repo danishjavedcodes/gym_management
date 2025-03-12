@@ -255,9 +255,10 @@ def view_members():
     if 'user_type' not in session:
         return redirect(url_for('login'))
     
-    if 'members' not in session.get('permissions', []) and session['user_type'] != 'admin':
+    # Check if the user is admin or has 'members' privilege
+    if session['user_type'] != 'admin' and 'members' not in session.get('privileges', []):
         flash('You do not have permission to view members')
-        return redirect(url_for('login'))
+        return redirect(url_for('staff_dashboard'))
     
     try:
         members_df = pd.read_excel('data/members.xlsx')
@@ -274,8 +275,7 @@ def view_members():
     except Exception as e:
         app.logger.error(f"Error loading members: {e}")
         flash('Error loading members data')
-        return redirect(url_for('login'))
-
+        return redirect(url_for('staff_dashboard'))
 
 @app.route('/members/edit/<member_id>', methods=['GET', 'POST'])
 def edit_member(member_id):
