@@ -55,7 +55,8 @@ def init_excel_files():
         'sales.xlsx': {
             'date': [], 'member_id': [], 'member_name': [], 'inventory_id': [], 
             'item_name': [], 'quantity': [], 'total_amount': [], 'payment_method': []
-        }
+        },
+        
     }
     
     for filename, columns in excel_files.items():
@@ -458,33 +459,45 @@ def add_payment():
     return redirect(url_for('payments'))
 
 # Receptionist management routes
-# Remove the entire manage_staff route and function
-
 @app.route('/admin/receptionists')
 def manage_receptionists():
     if 'user_type' not in session or session['user_type'] != 'admin':
         return redirect(url_for('login'))
     
     try:
-        receptionists_df = pd.read_excel('data/receptionists.xlsx')
-        return render_template('admin/receptionists.html', receptionists=receptionists_df.to_dict('records'))
+        # Create file if it doesn't exist
+        if not os.path.exists('data/receptionists.xlsx'):
+            df = pd.DataFrame(columns=[
+                'username', 'password', 'name', 'phone', 'address', 
+                'dob', 'age', 'gender', 'salary', 'next_of_kin_name',
+                'next_of_kin_phone', 'privileges', 'staff_type'
+            ])
+            df.to_excel('data/receptionists.xlsx', index=False)
+        
+        staff_df = pd.read_excel('data/receptionists.xlsx')
+        return render_template('admin/staff.html', staff=staff_df.to_dict('records'))
     except Exception as e:
         app.logger.error(f"Error loading staff data: {e}")
         flash('Error loading staff data')
-        return redirect(url_for('admin_dashboard'))  # Changed from 'dashboard' to 'admin_dashboard'
+        return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/receptionists/add', methods=['POST'])
-def add_receptionist():
+@app.route('/admin/staff/add', methods=['POST'])
+def add_staff():
     if 'user_type' not in session or session['user_type'] != 'admin':
         return redirect(url_for('login'))
     
     try:
         receptionists_df = pd.read_excel('data/receptionists.xlsx')
         
-        # Get privileges as a list
-        privileges = request.form.getlist('privileges[]')
+        # Get permissions as a list and join them
+        permissions = []
+        if request.form.get('perm_members'): permissions.append('members')
+        if request.form.get('perm_attendance'): permissions.append('attendance')
+        if request.form.get('perm_payments'): permissions.append('payments')
+        if request.form.get('perm_packages'): permissions.append('packages')
+        if request.form.get('perm_reports'): permissions.append('reports')
         
-        new_receptionist = {
+        new_staff = {
             'username': request.form.get('username'),
             'password': request.form.get('password'),
             'name': request.form.get('name'),
@@ -496,13 +509,14 @@ def add_receptionist():
             'salary': request.form.get('salary'),
             'next_of_kin_name': request.form.get('next_of_kin_name'),
             'next_of_kin_phone': request.form.get('next_of_kin_phone'),
-            'privileges': ','.join(privileges) if privileges else ''
+            'privileges': ','.join(permissions),
+            'staff_type': request.form.get('staff_type')
         }
         
-        if new_receptionist['username'] in receptionists_df['username'].values:
+        if new_staff['username'] in receptionists_df['username'].values:
             flash('Username already exists')
         else:
-            receptionists_df = pd.concat([receptionists_df, pd.DataFrame([new_receptionist])], 
+            receptionists_df = pd.concat([receptionists_df, pd.DataFrame([new_staff])], 
                                        ignore_index=True)
             receptionists_df.to_excel('data/receptionists.xlsx', index=False)
             flash('Staff member added successfully')
@@ -512,36 +526,60 @@ def add_receptionist():
     
     return redirect(url_for('manage_receptionists'))
 
-@app.route('/admin/receptionists/edit/<username>', methods=['POST'])
-def edit_receptionist(username):
+@app.route('/admin/staff/edit/<username>', methods=['GET', 'POST'])
+def edit_staff(username):
     if 'user_type' not in session or session['user_type'] != 'admin':
         return redirect(url_for('login'))
     
     try:
         receptionists_df = pd.read_excel('data/receptionists.xlsx')
+        staff_data = receptionists_df[receptionists_df['username'] == username]
         
-        # Get privileges as a list
-        privileges = request.form.getlist('privileges[]')
+        if staff_data.empty:
+            flash('Staff member not found')
+            return redirect(url_for('manage_receptionists'))
+            
+        if request.method == 'GET':
+            staff = staff_data.iloc[0].to_dict()
+            # Convert privileges string to list
+            staff['privileges'] = staff['privileges'].split(',') if isinstance(staff['privileges'], str) else []
+            return render_template('admin/edit_staff.html', staff=staff)
         
-        # Update staff member details
-        receptionists_df.loc[receptionists_df['username'] == username, 'name'] = request.form.get('name')
-        receptionists_df.loc[receptionists_df['username'] == username, 'phone'] = request.form.get('phone')
-        receptionists_df.loc[receptionists_df['username'] == username, 'address'] = request.form.get('address')
-        receptionists_df.loc[receptionists_df['username'] == username, 'dob'] = request.form.get('dob')
-        receptionists_df.loc[receptionists_df['username'] == username, 'age'] = request.form.get('age')
-        receptionists_df.loc[receptionists_df['username'] == username, 'gender'] = request.form.get('gender')
-        receptionists_df.loc[receptionists_df['username'] == username, 'salary'] = request.form.get('salary')
-        receptionists_df.loc[receptionists_df['username'] == username, 'next_of_kin_name'] = request.form.get('next_of_kin_name')
-        receptionists_df.loc[receptionists_df['username'] == username, 'next_of_kin_phone'] = request.form.get('next_of_kin_phone')
-        receptionists_df.loc[receptionists_df['username'] == username, 'privileges'] = ','.join(privileges) if privileges else ''
+        # Handle POST request
+        permissions = []
+        if request.form.get('perm_members'): permissions.append('members')
+        if request.form.get('perm_attendance'): permissions.append('attendance')
+        if request.form.get('perm_payments'): permissions.append('payments')
+        if request.form.get('perm_packages'): permissions.append('packages')
+        if request.form.get('perm_reports'): permissions.append('reports')
+        
+        # Update staff information
+        mask = receptionists_df['username'] == username
+        update_fields = {
+            'name': request.form.get('name'),
+            'phone': request.form.get('phone'),
+            'address': request.form.get('address'),
+            'dob': request.form.get('dob'),
+            'age': request.form.get('age'),
+            'gender': request.form.get('gender'),
+            'salary': request.form.get('salary'),
+            'next_of_kin_name': request.form.get('next_of_kin_name'),
+            'next_of_kin_phone': request.form.get('next_of_kin_phone'),
+            'staff_type': request.form.get('staff_type'),
+            'privileges': ','.join(permissions)
+        }
+        
+        for field, value in update_fields.items():
+            receptionists_df.loc[mask, field] = value
         
         receptionists_df.to_excel('data/receptionists.xlsx', index=False)
         flash('Staff member updated successfully')
+        return redirect(url_for('manage_receptionists'))
+        
     except Exception as e:
         app.logger.error(f"Error updating staff member: {e}")
-        flash('Error updating staff member')
-    
-    return redirect(url_for('manage_receptionists'))
+        flash(f'Error updating staff member: {str(e)}')
+        return redirect(url_for('manage_receptionists'))
 
 @app.route('/admin/receptionists/delete/<username>')
 def delete_receptionist(username):
