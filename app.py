@@ -19,9 +19,12 @@ if not os.path.exists('data'):
 # Add this to your init_excel_files function
 def init_excel_files():
     excel_files = {
+        # In the init_excel_files function, update the members.xlsx structure
         'members.xlsx': {
-            'id': [], 'name': [], 'address': [], 'package': [],
-            'weight': [], 'height': [], 'join_date': [], 'payment_status': []
+            'member_id': [], 'name': [], 'phone': [], 'address': [], 
+            'dob': [], 'age': [], 'gender': [], 
+            'next_of_kin_name': [], 'next_of_kin_phone': [],
+            'package': [], 'join_date': [], 'expiry_date': [], 'status': []
         },
         'packages.xlsx': {
             'name': [], 'price': [], 'trainers': [], 
@@ -183,37 +186,122 @@ def view_members():
         return redirect(url_for('login'))
     
     try:
-        members_df = pd.read_excel('data/members.xlsx')
-        packages_df = pd.read_excel('data/packages.xlsx')
+        # Ensure data directory exists
+        os.makedirs('data', exist_ok=True)
+        
+        # Initialize or read members.xlsx
+        members_path = 'data/members.xlsx'
+        if not os.path.exists(members_path):
+            initial_members_df = pd.DataFrame({
+                'member_id': pd.Series(dtype='str'),
+                'name': pd.Series(dtype='str'),
+                'phone': pd.Series(dtype='str'),
+                'address': pd.Series(dtype='str'),
+                'dob': pd.Series(dtype='str'),
+                'age': pd.Series(dtype='str'),
+                'gender': pd.Series(dtype='str'),
+                'next_of_kin_name': pd.Series(dtype='str'),
+                'next_of_kin_phone': pd.Series(dtype='str'),
+                'package': pd.Series(dtype='str'),
+                'join_date': pd.Series(dtype='str'),
+                'expiry_date': pd.Series(dtype='str'),
+                'status': pd.Series(dtype='str')
+            })
+            initial_members_df.to_excel(members_path, index=False)
+            members_df = initial_members_df
+        else:
+            members_df = pd.read_excel(members_path, dtype=str)
+        
+        # Initialize or read packages.xlsx
+        packages_path = 'data/packages.xlsx'
+        if not os.path.exists(packages_path):
+            initial_packages_df = pd.DataFrame({
+                'name': pd.Series(dtype='str'),
+                'price': pd.Series(dtype='str'),
+                'trainers': pd.Series(dtype='str'),
+                'cardio_access': pd.Series(dtype='str'),
+                'timings': pd.Series(dtype='str'),
+                'duration': pd.Series(dtype='str')
+            })
+            initial_packages_df.to_excel(packages_path, index=False)
+            packages_df = initial_packages_df
+        else:
+            packages_df = pd.read_excel(packages_path, dtype=str)
+        
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # Handle members data
+        members_records = []
+        if not members_df.empty:
+            members_df = members_df.fillna('')
+            members_df['status'] = members_df.apply(
+                lambda x: 'Active' if pd.notna(x['expiry_date']) and 
+                str(x['expiry_date']).strip() and 
+                pd.to_datetime(str(x['expiry_date'])) >= pd.to_datetime(today) 
+                else 'Expired', 
+                axis=1
+            )
+            members_records = members_df.to_dict('records')
+        
+        # Handle packages data
+        packages_records = []
+        if not packages_df.empty:
+            packages_df = packages_df.fillna('')
+            packages_records = packages_df.to_dict('records')
+        
         return render_template('members.html', 
-                             members=members_df.to_dict('records'),
-                             packages=packages_df.to_dict('records'))
+                             members=members_records,
+                             packages=packages_records,
+                             today=today)
+                             
     except Exception as e:
-        app.logger.error(f"Error reading Excel files: {e}")
-        flash('Error loading data')
+        app.logger.error(f"Error in view_members: {str(e)}")
+        flash(f'Error loading data: {str(e)}')
         return redirect(url_for('login'))
+
+
 
 @app.route('/members/add', methods=['POST'])
 def add_member():
-    if 'user_type' not in session:
-        return redirect(url_for('login'))
-    
     try:
         members_df = pd.read_excel('data/members.xlsx')
+        packages_df = pd.read_excel('data/packages.xlsx')
+        
+        # Generate 4-digit unique member ID
+        if len(members_df) == 0:
+            next_id = 1
+        else:
+            # Get the maximum ID and increment by 1
+            current_max = max([int(str(id).zfill(4)) for id in members_df['member_id']])
+            next_id = current_max + 1
+        member_id = str(next_id).zfill(4)  # Pad with zeros to make 4 digits
+        
+        # Get package duration and calculate expiry date
+        package_name = request.form.get('package')
+        package_duration = int(packages_df[packages_df['name'] == package_name]['duration'].iloc[0])
+        join_date = datetime.now().date()
+        expiry_date = join_date + timedelta(days=package_duration)
+        
         new_member = {
-            'id': str(len(members_df) + 1),
+            'member_id': member_id,
             'name': request.form.get('name'),
+            'phone': request.form.get('phone'),
             'address': request.form.get('address'),
-            'package': request.form.get('package'),
-            'weight': float(request.form.get('weight')),
-            'height': float(request.form.get('height')),
-            'join_date': datetime.now().strftime('%Y-%m-%d'),
-            'payment_status': 'Pending'
+            'dob': request.form.get('dob'),
+            'age': request.form.get('age'),
+            'gender': request.form.get('gender'),
+            'next_of_kin_name': request.form.get('next_of_kin_name'),
+            'next_of_kin_phone': request.form.get('next_of_kin_phone'),
+            'package': package_name,
+            'join_date': join_date.strftime('%Y-%m-%d'),
+            'expiry_date': expiry_date.strftime('%Y-%m-%d'),
+            'status': 'Active'
         }
         
         members_df = pd.concat([members_df, pd.DataFrame([new_member])], ignore_index=True)
         members_df.to_excel('data/members.xlsx', index=False)
         flash('Member added successfully')
+        
     except Exception as e:
         app.logger.error(f"Error adding member: {e}")
         flash('Error adding member')
@@ -274,16 +362,108 @@ def attendance():
     try:
         members_df = pd.read_excel('data/members.xlsx')
         attendance_df = pd.read_excel('data/attendance.xlsx')
+        staff_df = pd.read_excel('data/receptionists.xlsx')
+        staff_attendance_df = pd.read_excel('data/trainer_attendance.xlsx')
+        
         today = datetime.now().strftime('%Y-%m-%d')
         today_attendance = attendance_df[attendance_df['date'] == today]
+        today_staff_attendance = staff_attendance_df[staff_attendance_df['date'] == today]
         
         return render_template('attendance.html',
                              members=members_df.to_dict('records'),
-                             attendance=today_attendance.to_dict('records'))
+                             attendance=today_attendance.to_dict('records'),
+                             staff=staff_df.to_dict('records'),
+                             staff_attendance=today_staff_attendance.to_dict('records'))
     except Exception as e:
         app.logger.error(f"Error reading Excel files: {e}")
         flash('Error loading attendance data')
         return redirect(url_for('login'))
+
+@app.route('/staff_attendance')
+def staff_attendance():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        staff_df = pd.read_excel('data/receptionists.xlsx')
+        staff_attendance_df = pd.read_excel('data/trainer_attendance.xlsx')
+        
+        today = datetime.now().strftime('%Y-%m-%d')
+        today_staff_attendance = staff_attendance_df[staff_attendance_df['date'] == today]
+        
+        return render_template('staff_attendance.html',
+                             staff=staff_df.to_dict('records'),
+                             staff_attendance=today_staff_attendance.to_dict('records'))
+    except Exception as e:
+        app.logger.error(f"Error reading Excel files: {e}")
+        flash('Error loading staff attendance data')
+        return redirect(url_for('login'))
+
+
+@app.route('/mark_staff_attendance', methods=['POST'])
+def mark_staff_attendance():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        staff_attendance_df = pd.read_excel('data/trainer_attendance.xlsx')
+        staff_df = pd.read_excel('data/receptionists.xlsx')
+        
+        # Ensure check_out column exists
+        if 'check_out' not in staff_attendance_df.columns:
+            staff_attendance_df['check_out'] = None
+        
+        staff_id = request.form.get('staff_id')
+        action = request.form.get('staff_attendance_action')
+        staff_query = staff_df[staff_df['username'] == staff_id]
+        
+        if staff_query.empty:
+            flash('Staff member not found')
+            return redirect(url_for('staff_attendance'))
+        
+        staff = staff_query.iloc[0]
+        today = datetime.now().strftime('%Y-%m-%d')
+        current_time = datetime.now().strftime('%H:%M:%S')
+        
+        # Check if staff has already checked in today
+        today_attendance = staff_attendance_df[
+            (staff_attendance_df['date'] == today) & 
+            (staff_attendance_df['trainer_id'] == staff_id)
+        ]
+        
+        if action == 'check_in':
+            if today_attendance.empty:
+                new_attendance = {
+                    'date': today,
+                    'trainer_id': staff_id,
+                    'trainer_name': staff['name'],
+                    'staff_type': staff['staff_type'],
+                    'check_in': current_time,
+                    'check_out': None
+                }
+                staff_attendance_df = pd.concat([staff_attendance_df, pd.DataFrame([new_attendance])], ignore_index=True)
+                flash('Staff check-in recorded successfully')
+            else:
+                flash('Staff member already checked in for today')
+        
+        elif action == 'check_out':
+            if not today_attendance.empty and pd.isna(today_attendance.iloc[0]['check_out']):
+                staff_attendance_df.loc[
+                    (staff_attendance_df['date'] == today) & 
+                    (staff_attendance_df['trainer_id'] == staff_id),
+                    'check_out'
+                ] = current_time
+                flash('Staff check-out recorded successfully')
+            else:
+                flash('No check-in record found for today or already checked out')
+        
+        staff_attendance_df.to_excel('data/trainer_attendance.xlsx', index=False)
+        
+    except Exception as e:
+        app.logger.error(f"Error marking staff attendance: {e}")
+        flash('Error marking staff attendance')
+    
+    return redirect(url_for('staff_attendance'))
 
 @app.route('/attendance/mark', methods=['POST'])
 def mark_attendance():

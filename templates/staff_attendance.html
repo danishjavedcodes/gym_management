@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Staff Attendance Management</h2>
+    
+    <div class="row mb-4">
+        <div class="col">
+            <h3>Mark Staff Attendance</h3>
+            <form action="{{ url_for('mark_staff_attendance') }}" method="POST" class="mb-4">
+                <div class="row align-items-end">
+                    <div class="col-md-6">
+                        <label for="staff_id" class="form-label">Select Staff Member</label>
+                        <select class="form-control" id="staff_id" name="staff_id" required>
+                            <option value="">Select Staff</option>
+                            {% for staff_member in staff %}
+                            <option value="{{ staff_member.username }}">{{ staff_member.name }} ({{ staff_member.staff_type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <button type="submit" name="staff_attendance_action" value="check_in" class="btn btn-success me-2">
+                            Check In
+                        </button>
+                        <button type="submit" name="staff_attendance_action" value="check_out" class="btn btn-warning">
+                            Check Out
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <h3>Today's Staff Attendance</h3>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Staff Type</th>
+                    <th>Check In Time</th>
+                    <th>Check Out Time</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in staff_attendance %}
+                <tr>
+                    <td>{{ record.trainer_name }}</td>
+                    <td>{{ record.staff_type }}</td>
+                    <td>{{ record.check_in }}</td>
+                    <td>{{ record.check_out if record.check_out else 'Not checked out' }}</td>
+                    <td>
+                        {% if record.check_out %}
+                        <span class="badge bg-success">Completed</span>
+                        {% else %}
+                        <span class="badge bg-warning">In Progress</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
