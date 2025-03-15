@@ -666,40 +666,95 @@ def add_member():
 
 
 
-@app.route('/payments/add', methods=['POST'])
-def add_payment():
+# @app.route('/payments/add', methods=['POST'])
+# def add_payment():
+#     if 'user_type' not in session:
+#         return redirect(url_for('login'))
+    
+#     try:
+#         payments_df = pd.read_excel('data/payments.xlsx')
+#         members_df = pd.read_excel('data/members.xlsx')
+        
+#         member_id = request.form.get('member_id')
+#         member = members_df[members_df['id'].astype(str) == str(member_id)].iloc[0]
+        
+#         new_payment = {
+#             'date': datetime.now().strftime('%Y-%m-%d'),
+#             'member_id': member_id,
+#             'member_name': member['name'],
+#             'package': member['package'],
+#             'amount': float(request.form.get('amount')),
+#             'status': 'Paid'
+#         }
+        
+#         payments_df = pd.concat([payments_df, pd.DataFrame([new_payment])], ignore_index=True)
+#         payments_df.to_excel('data/payments.xlsx', index=False)
+        
+#         # Update member payment status
+#         members_df.loc[members_df['id'].astype(str) == str(member_id), 'payment_status'] = 'Paid'
+#         members_df.to_excel('data/members.xlsx', index=False)
+        
+#         flash('Payment recorded successfully')
+#     except Exception as e:
+#         app.logger.error(f"Error recording payment: {e}")
+#         flash('Error recording payment')
+    
+#     return redirect(url_for('payments'))
+
+@app.route('/payments/mark_as_paid', methods=['POST'])
+def mark_payment_as_paid():
     if 'user_type' not in session:
         return redirect(url_for('login'))
     
     try:
+        # Initialize DataFrames
+        if not os.path.exists('data/payments.xlsx'):
+            pd.DataFrame(columns=['date', 'member_id', 'member_name', 'package', 'amount', 'status']).to_excel('data/payments.xlsx', index=False)
+        
         payments_df = pd.read_excel('data/payments.xlsx')
         members_df = pd.read_excel('data/members.xlsx')
+        packages_df = pd.read_excel('data/packages.xlsx')
         
         member_id = request.form.get('member_id')
+        if not member_id:
+            raise ValueError("Member ID is required")
+            
         member = members_df[members_df['id'].astype(str) == str(member_id)].iloc[0]
+        package_name = member['package']
         
-        new_payment = {
+        # Get package price safely
+        package_row = packages_df[packages_df['name'] == package_name]
+        if package_row.empty:
+            raise ValueError(f"Package {package_name} not found")
+        package_price = package_row['price'].iloc[0]
+        
+        # Create new payment record
+        new_payment = pd.DataFrame([{
             'date': datetime.now().strftime('%Y-%m-%d'),
             'member_id': member_id,
             'member_name': member['name'],
-            'package': member['package'],
-            'amount': float(request.form.get('amount')),
+            'package': package_name,
+            'amount': float(package_price),
             'status': 'Paid'
-        }
+        }])
         
-        payments_df = pd.concat([payments_df, pd.DataFrame([new_payment])], ignore_index=True)
+        # Update payments
+        payments_df = pd.concat([payments_df, new_payment], ignore_index=True)
         payments_df.to_excel('data/payments.xlsx', index=False)
         
-        # Update member payment status
+        # Update member status
         members_df.loc[members_df['id'].astype(str) == str(member_id), 'payment_status'] = 'Paid'
         members_df.to_excel('data/members.xlsx', index=False)
         
         flash('Payment recorded successfully')
+        
     except Exception as e:
-        app.logger.error(f"Error recording payment: {e}")
-        flash('Error recording payment')
+        app.logger.error(f"Error recording payment: {str(e)}")
+        flash(f'Error recording payment: {str(e)}')
     
     return redirect(url_for('payments'))
+
+
 
 # Receptionist management routes
 @app.route('/admin/receptionists')
