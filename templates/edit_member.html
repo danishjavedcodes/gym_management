@@ -20,6 +20,21 @@
             <label class="form-label">Date of Birth</label>
             <input type="text" name="address" value="{{ member.address }}" class="form-control" required>
         </div>
+        <div class="mb-3">
+            <label class="form-label">Medical Conditions</label>
+            <textarea class="form-control" name="medical_conditions">{{ member.medical_conditions }}</textarea>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label">Next of Kin Name</label>
+            <input type="text" class="form-control" name="next_of_kin_name" value="{{ member.next_of_kin_name }}" required>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label">Next of Kin Phone</label>
+            <input type="tel" class="form-control" name="next_of_kin_phone" value="{{ member.next_of_kin_phone }}" required>
+        </div>
+        
         <div class="mb-4">
             <label class="block text-gray-700 text-sm font-bold mb-2">Package</label>
             <select name="package" class="form-control" required>

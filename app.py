@@ -294,31 +294,41 @@ def edit_member(member_id):
     try:
         members_df = pd.read_excel('data/members.xlsx')
         packages_df = pd.read_excel('data/packages.xlsx')
+        member_data = members_df[members_df['id'].astype(str) == str(member_id)]
+        
+        if member_data.empty:
+            flash('Member not found')
+            return redirect(url_for('view_members'))
         
         if request.method == 'POST':
+            # Update member information
             members_df.loc[members_df['id'].astype(str) == str(member_id), 'name'] = request.form.get('name')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'gender'] = request.form.get('gender')  # Add this line
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'gender'] = request.form.get('gender')
             members_df.loc[members_df['id'].astype(str) == str(member_id), 'dob'] = request.form.get('dob')
             members_df.loc[members_df['id'].astype(str) == str(member_id), 'address'] = request.form.get('address')
             members_df.loc[members_df['id'].astype(str) == str(member_id), 'medical_conditions'] = request.form.get('medical_conditions')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'next_of_kin'] = request.form.get('next_of_kin')
             members_df.loc[members_df['id'].astype(str) == str(member_id), 'package'] = request.form.get('package')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'weight'] = float(request.form.get('weight'))
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'height'] = float(request.form.get('height'))
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'weight'] = request.form.get('weight')
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'height'] = request.form.get('height')
+            
+            # Update next of kin information
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'next_of_kin_name'] = request.form.get('next_of_kin_name')
+            members_df.loc[members_df['id'].astype(str) == str(member_id), 'next_of_kin_phone'] = request.form.get('next_of_kin_phone')
             
             members_df.to_excel('data/members.xlsx', index=False)
             flash('Member updated successfully')
             return redirect(url_for('view_members'))
         
-        member = members_df[members_df['id'].astype(str) == str(member_id)].iloc[0]
+        # GET request - display edit form
+        member = member_data.iloc[0].to_dict()
         return render_template('edit_member.html', 
-                             member=member.to_dict(),
+                             member=member,
                              packages=packages_df.to_dict('records'))
+                             
     except Exception as e:
         app.logger.error(f"Error editing member: {e}")
         flash('Error updating member')
         return redirect(url_for('view_members'))
-
 
 @app.route('/members/delete/<member_id>')
 def delete_member(member_id):
@@ -682,7 +692,9 @@ def add_member_page():
     
     try:
         packages_df = pd.read_excel('data/packages.xlsx')
-        return render_template('add_member.html', packages=packages_df.to_dict('records'))
+        return render_template('add_member.html', 
+                             packages=packages_df.to_dict('records'),
+                             datetime=datetime)  # Pass datetime to the template
     except Exception as e:
         app.logger.error(f"Error loading add member page: {e}")
         flash('Error loading packages data')
@@ -690,29 +702,33 @@ def add_member_page():
 
 @app.route('/members/add', methods=['POST'])
 def add_member():
-    if 'user_type' not in session:
-        return redirect(url_for('login'))
-    
     try:
         members_df = pd.read_excel('data/members.xlsx')
+        
+        # Get next of kin details separately
+        kin_name = request.form.get('kin_name')
+        kin_phone = request.form.get('kin_phone')
+        
         new_member = {
-            'id': str(len(members_df) + 1),
             'name': request.form.get('name'),
             'gender': request.form.get('gender'),
             'dob': request.form.get('dob'),
+            'phone': request.form.get('phone'),
             'address': request.form.get('address'),
-            'medical_conditions': request.form.get('medical_conditions'),
-            'next_of_kin': request.form.get('next_of_kin'),
             'package': request.form.get('package'),
-            'weight': float(request.form.get('weight')),
-            'height': float(request.form.get('height')),
-            'join_date': datetime.now().strftime('%Y-%m-%d'),
-            'payment_status': 'Pending'
+            'join_date': datetime.now().strftime('%Y-%m-%d'),  # Automatic join date
+            'next_of_kin_name': kin_name,
+            'next_of_kin_phone': kin_phone,
+            'medical_conditions': request.form.get('medical_conditions'),
+            'weight': request.form.get('weight'),  # Added weight
+            'height': request.form.get('height'),  # Added height
+            'status': 'Active'
         }
         
         members_df = pd.concat([members_df, pd.DataFrame([new_member])], ignore_index=True)
         members_df.to_excel('data/members.xlsx', index=False)
         flash('Member added successfully')
+        
     except Exception as e:
         app.logger.error(f"Error adding member: {e}")
         flash('Error adding member')
