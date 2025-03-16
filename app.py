@@ -28,8 +28,14 @@ def init_excel_files():
             'height': [], 'weight': []  # Added height and weight
         },
         'packages.xlsx': {
-            'name': [], 'price': [], 'trainers': [], 
-            'cardio_access': [], 'timings': [], 'duration': []  # Added duration field
+            'name': [], 
+            'price': [], 
+            'duration': [],
+            'trainers': [], 
+            'cardio_access': [], 
+            'sauna_access': [],  # New column
+            'steam_room': [],    # New column
+            'timings': []
         },
         'trainers.xlsx': {
             'id': [], 'name': [], 'specialization': [], 'schedule': []
@@ -101,9 +107,12 @@ def login_post():
             session.permanent = True
             session['user_type'] = 'staff'
             session['username'] = username
-            # Store privileges as a list
+            # Fix privilege handling
             privileges_str = receptionist.iloc[0]['privileges']
-            session['privileges'] = privileges_str.split(',') if isinstance(privileges_str, str) and privileges_str else []
+            if pd.isna(privileges_str):  # Check for NaN values
+                session['privileges'] = []
+            else:
+                session['privileges'] = [p.strip() for p in privileges_str.split(',') if p.strip()]
             return redirect(url_for('staff_dashboard'))
         
         flash('Invalid credentials')
@@ -352,8 +361,8 @@ def attendance():
     if 'user_type' not in session:
         return redirect(url_for('login'))
     
-    # Check for both admin and staff with member_attendance privilege
-    if session['user_type'] != 'admin' and 'member_attendance' not in session.get('privileges', []):
+    # Fix: Changed member_attendance to attendance
+    if session['user_type'] != 'admin' and 'attendance' not in session.get('privileges', []):
         flash('Access denied')
         return redirect(url_for('staff_dashboard'))
     
@@ -528,31 +537,44 @@ def mark_attendance():
 # Package management routes
 @app.route('/packages')
 def packages():
-    if 'user_type' not in session or session['user_type'] != 'admin':
+    if 'user_type' not in session:
         return redirect(url_for('login'))
+    
+    if session['user_type'] != 'admin' and 'packages' not in session.get('privileges', []):
+        flash('Access denied')
+        return redirect(url_for('staff_dashboard'))
     
     try:
         packages_df = pd.read_excel('data/packages.xlsx')
-        return render_template('packages.html', packages=packages_df.to_dict('records'))
+        return render_template('packages.html', 
+                             packages=packages_df.to_dict('records'),
+                             is_admin=session['user_type'] == 'admin')
     except Exception as e:
         app.logger.error(f"Error reading packages file: {e}")
         flash('Error loading packages data')
-        return redirect(url_for('login'))
+        return redirect(url_for('staff_dashboard'))
 
 @app.route('/packages/add', methods=['POST'])
 def add_package():
-    if 'user_type' not in session or session['user_type'] != 'admin':
+    if 'user_type' not in session:
         return redirect(url_for('login'))
+    
+    # Allow both admin and staff with packages privilege
+    if session['user_type'] != 'admin' and 'packages' not in session.get('privileges', []):
+        flash('Access denied')
+        return redirect(url_for('staff_dashboard'))
     
     try:
         packages_df = pd.read_excel('data/packages.xlsx')
         new_package = {
             'name': request.form.get('name'),
             'price': float(request.form.get('price')),
+            'duration': request.form.get('duration'),
             'trainers': request.form.get('trainers'),
             'cardio_access': request.form.get('cardio_access'),
-            'timings': request.form.get('timings'),
-            'duration': request.form.get('duration')  # Added duration field
+            'sauna_access': request.form.get('sauna_access'),
+            'steam_room': request.form.get('steam_room'),
+            'timings': request.form.get('timings')
         }
         
         packages_df = pd.concat([packages_df, pd.DataFrame([new_package])], ignore_index=True)
@@ -566,22 +588,17 @@ def add_package():
 
 @app.route('/packages/delete/<name>')
 def delete_package(name):
-    if 'user_type' not in session or session['user_type'] != 'admin':
+    if 'user_type' not in session:
         return redirect(url_for('login'))
+    
+    # Allow both admin and staff with packages privilege
+    if session['user_type'] != 'admin' and 'packages' not in session.get('privileges', []):
+        flash('Access denied')
+        return redirect(url_for('staff_dashboard'))
     
     try:
         packages_df = pd.read_excel('data/packages.xlsx')
-        
-        # Log the DataFrame before deletion for debugging
-        app.logger.debug(f"Packages DataFrame before deletion:\n{packages_df}")
-        
-        # Ensure the correct column name is used for filtering
         packages_df = packages_df[packages_df['name'] != name]
-        
-        # Log the DataFrame after deletion for debugging
-        app.logger.debug(f"Packages DataFrame after deletion:\n{packages_df}")
-        
-        # Save the updated DataFrame back to the Excel file
         packages_df.to_excel('data/packages.xlsx', index=False)
         flash('Package deleted successfully')
     except Exception as e:
@@ -590,6 +607,44 @@ def delete_package(name):
     
     return redirect(url_for('packages'))
 
+@app.route('/packages/edit/<name>', methods=['GET', 'POST'])
+def edit_package(name):
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    # Allow both admin and staff with packages privilege
+    if session['user_type'] != 'admin' and 'packages' not in session.get('privileges', []):
+        flash('Access denied')
+        return redirect(url_for('staff_dashboard'))
+    
+    try:
+        packages_df = pd.read_excel('data/packages.xlsx')
+        package_row = packages_df[packages_df['name'] == name]
+        
+        if package_row.empty:
+            flash('Package not found')
+            return redirect(url_for('packages'))
+            
+        if request.method == 'POST':
+            packages_df.loc[packages_df['name'] == name, 'price'] = float(request.form.get('price'))
+            packages_df.loc[packages_df['name'] == name, 'duration'] = int(request.form.get('duration'))
+            packages_df.loc[packages_df['name'] == name, 'trainers'] = request.form.get('trainers')
+            packages_df.loc[packages_df['name'] == name, 'cardio_access'] = request.form.get('cardio_access')
+            packages_df.loc[packages_df['name'] == name, 'sauna_access'] = request.form.get('sauna_access')
+            packages_df.loc[packages_df['name'] == name, 'steam_room'] = request.form.get('steam_room')
+            packages_df.loc[packages_df['name'] == name, 'timings'] = request.form.get('timings')
+            
+            packages_df.to_excel('data/packages.xlsx', index=False)
+            flash('Package updated successfully')
+            return redirect(url_for('packages'))
+        
+        package = package_row.iloc[0].to_dict()
+        return render_template('edit_package.html', package=package)
+        
+    except Exception as e:
+        app.logger.error(f"Error editing package: {e}")
+        flash('Error updating package')
+        return redirect(url_for('packages'))
 
 
 # Payment management routes
@@ -700,6 +755,8 @@ def add_member():
 #         flash('Error recording payment')
     
 #     return redirect(url_for('payments'))
+
+
 
 @app.route('/payments/mark_as_paid', methods=['POST'])
 def mark_payment_as_paid():

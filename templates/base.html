@@ -39,7 +39,7 @@
 
                     {% if session.user_type == 'admin' or 'packages' in session.get('privileges', []) %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('packages') }}">Manage Packages</a>
+                        <a class="nav-link" href="{{ url_for('packages') }}">{{ 'Manage Packages' if session.user_type == 'admin' else 'View Packages' }}</a>
                     </li>
                     {% endif %}
 

@@ -13,20 +13,18 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Members</h5>
-                    <p class="card-text">Total Members: {{ dashboard_data.total_members }}</p>
                     <a href="{{ url_for('view_members') }}" class="btn btn-primary">View Members</a>
                 </div>
             </div>
         </div>
         {% endif %}
 
-        {% if 'member_attendance' in privileges %}
+        {% if 'attendance' in privileges %}
         <div class="col-md-4 mb-3">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Member Attendance</h5>
-                    <p class="card-text">Today's Member Attendance: {{ dashboard_data.today_member_attendance }}</p>
-                    <a href="{{ url_for('attendance') }}" class="btn btn-primary">Manage Member Attendance</a>
+                    <a href="{{ url_for('attendance') }}" class="btn btn-primary">Member Attendance</a>
                 </div>
             </div>
         </div>
@@ -37,8 +35,18 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Staff Attendance</h5>
-                    <p class="card-text">Today's Staff Attendance: {{ dashboard_data.today_staff_attendance }}</p>
-                    <a href="{{ url_for('staff_attendance') }}" class="btn btn-primary">Manage Staff Attendance</a>
+                    <a href="{{ url_for('staff_attendance') }}" class="btn btn-primary">Staff Attendance</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if 'packages' in privileges %}
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Packages</h5>
+                    <a href="{{ url_for('packages') }}" class="btn btn-primary">View Packages</a>
                 </div>
             </div>
         </div>
@@ -49,27 +57,11 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Payments</h5>
-                    <p class="card-text">Today's Payments: {{ dashboard_data.today_payments }}</p>
                     <a href="{{ url_for('payments') }}" class="btn btn-primary">View Payments</a>
                 </div>
             </div>
         </div>
         {% endif %}
-    </div>
-
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Your Privileges</h5>
-                    <ul class="list-group">
-                        {% for privilege in privileges %}
-                        <li class="list-group-item">{{ privilege|title }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 {% endblock %}
