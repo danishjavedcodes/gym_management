@@ -2,10 +2,11 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center">
-        <h2>Welcome, {{ staff_name }}</h2>
+    <div class="d-flex justify-content-end mb-4">
+        <a href="{{ url_for('change_password') }}" class="btn btn-primary me-2">Change Password</a>
         <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
     </div>
+    <h2>Welcome, {{ session.username }}!</h2>
     
     <div class="row mt-4">
         {% if 'members' in privileges %}

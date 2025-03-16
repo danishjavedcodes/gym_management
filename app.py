@@ -1305,6 +1305,46 @@ def sales_report():
         return redirect(url_for('sales'))
 
 
+@app.route('/change_password', methods=['GET', 'POST'])
+def change_password():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        try:
+            current_password = request.form.get('current_password')
+            new_password = request.form.get('new_password')
+            confirm_password = request.form.get('confirm_password')
+            
+            if new_password != confirm_password:
+                flash('New passwords do not match')
+                return redirect(url_for('change_password'))
+            
+            # Load appropriate Excel file based on user type
+            file_path = 'data/admin.xlsx' if session['user_type'] == 'admin' else 'data/receptionists.xlsx'
+            df = pd.read_excel(file_path)
+            
+            # Verify current password
+            user_row = df[df['username'] == session['username']]
+            if user_row.empty or user_row.iloc[0]['password'] != current_password:
+                flash('Current password is incorrect')
+                return redirect(url_for('change_password'))
+            
+            # Update password
+            df.loc[df['username'] == session['username'], 'password'] = new_password
+            df.to_excel(file_path, index=False)
+            
+            flash('Password changed successfully')
+            return redirect(url_for('admin_dashboard' if session['user_type'] == 'admin' else 'staff_dashboard'))
+            
+        except Exception as e:
+            flash('Error changing password')
+            return redirect(url_for('change_password'))
+    
+    return render_template('change_password.html')
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
 
