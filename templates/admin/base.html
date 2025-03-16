@@ -1,139 +1,65 @@
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Admin Dashboard{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100">
-    <nav class="bg-gray-800 text-white">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex items-center justify-between h-16">
-                <div class="flex items-center space-x-4">
-                    <a href="{{ url_for('admin_dashboard') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Dashboard</a>
-                    <a href="{{ url_for('view_members') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Members</a>
-                    <a href="{{ url_for('packages') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Packages</a>
-                    <a href="{{ url_for('manage_receptionists') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Staff</a>
-                    <a href="{{ url_for('reports') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Reports</a>
-                    <a href="{{ url_for('inventory') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Inventory</a>
-                    <a href="{{ url_for('sales') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Sales</a>
-                </div>
-                <a href="{{ url_for('logout') }}" class="hover:bg-red-600 bg-red-500 px-3 py-2 rounded">Logout</a>
-            </div>
-        </div>
-    </nav>
-
-    <main class="max-w-7xl mx-auto py-6 px-4">
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        {% block content %}{% endblock %}
-    </main>
-</body>
-</html> -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gym Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
-    {% if session.user_type %}
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="{{ url_for('admin_dashboard' if session.user_type == 'admin' else 'receptionist_dashboard') }}">
-                <i class="fas fa-dumbbell me-2"></i>Gym Management
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/members' %}active{% endif %}" href="{{ url_for('view_members') }}">
-                            <i class="fas fa-users me-1"></i> Members
-                        </a>
-                    </li>
-                    {% if session.user_type == 'admin' %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/admin/dashboard' %}active{% endif %}" href="{{ url_for('admin_dashboard') }}">
-                            <i class="fas fa-tachometer-alt me-1"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/packages' %}active{% endif %}" href="{{ url_for('packages') }}">
-                            <i class="fas fa-box me-1"></i> Packages
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/inventory' %}active{% endif %}" href="{{ url_for('inventory') }}">
-                            <i class="fas fa-boxes me-1"></i> Inventory
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/manage_receptionists' %}active{% endif %}" href="{{ url_for('manage_receptionists') }}">
-                            <i class="fas fa-user-tie me-1"></i> Staff
-                        </a>
-                    </li>
-                    {% endif %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/payments' %}active{% endif %}" href="{{ url_for('payments') }}">
-                            <i class="fas fa-money-bill-wave me-1"></i> Payments
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/attendance' %}active{% endif %}" href="{{ url_for('attendance') }}">
-                            <i class="fas fa-calendar-check me-1"></i> Attendance
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/reports' %}active{% endif %}" href="{{ url_for('reports') }}">
-                            <i class="fas fa-chart-bar me-1"></i> Reports
-                        </a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('logout') }}">
-                            <i class="fas fa-sign-out-alt me-1"></i> Logout
-                        </a>
-                    </li>
-                </ul>
+    <nav class="bg-gray-800 shadow-lg">
+        <div class="flex h-16 items-center px-4 justify-between">
+            <div class="flex items-center">
+                <a href="{{ url_for('admin_dashboard') }}" class="text-white flex items-center mr-4">
+                    <i class="fas fa-dumbbell mr-2"></i>
+                    <span class="font-bold text-lg">Gym Management</span>
+                </a>
+                
+                <div class="flex items-center space-x-2">
+                    <a href="{{ url_for('view_members') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Manage Members
+                    </a>
+                    <a href="{{ url_for('attendance') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Attendance
+                    </a>
+                    <a href="{{ url_for('staff_attendance') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Staff Attendance
+                    </a>
+                    <a href="{{ url_for('packages') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Manage Packages
+                    </a>
+                    <a href="{{ url_for('manage_receptionists') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Manage Staff
+                    </a>
+                    <a href="{{ url_for('inventory') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Manage Inventory
+                    </a>
+                    <a href="{{ url_for('sales') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Manage Sales
+                    </a>
+                    <a href="{{ url_for('payments') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        View Payments
+                    </a>
+                    <a href="{{ url_for('reports') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        View Reports
+                    </a>
+                </div>
+            </div>
+            
+            <div class="text-white font-medium">
+                {{ session.get('username', 'Admin') }}
             </div>
         </div>
     </nav>
-    {% endif %}
 
     <div class="container mt-4">
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-info alert-dismissible fade show">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
         {% block content %}{% endblock %}
     </div>
 
-    <!-- Bootstrap 5 Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
