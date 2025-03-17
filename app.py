@@ -21,11 +21,22 @@ def init_excel_files():
     excel_files = {
         # In the init_excel_files function, update the members.xlsx structure
         'members.xlsx': {
-            'member_id': [], 'name': [], 'phone': [], 'address': [], 
-            'dob': [], 'age': [], 'gender': [], 
-            'next_of_kin_name': [], 'next_of_kin_phone': [],
-            'package': [], 'join_date': [], 'expiry_date': [], 'status': [],
-            'height': [], 'weight': []  # Added height and weight
+            'member_id': [], 
+            'name': [], 
+            'phone': [], 
+            'address': [], 
+            'dob': [], 
+            'gender': [], 
+            'next_of_kin_name': [], 
+            'next_of_kin_phone': [],
+            'package': [], 
+            'join_date': [], 
+            'expiry_date': [], 
+            'status': [],
+            'payment_status': [],
+            'medical_conditions': [],
+            'weight': [],
+            'height': []
         },
         'packages.xlsx': {
             'name': [], 
@@ -219,58 +230,11 @@ def receptionist_dashboard():
         return redirect(url_for('login'))
     return render_template('receptionist/dashboard.html')
 
-# @app.route('/view_members')
-# def view_members():
-#     if 'user_type' not in session:
-#         return redirect(url_for('login'))
-    
-#     if session['user_type'] != 'admin' and 'members' not in session.get('privileges', []):
-#         flash('Access denied')
-#         return redirect(url_for('staff_dashboard'))
-    
-#     try:
-#         # Read Excel files with proper error handling
-#         members_df = pd.read_excel('data/members.xlsx')
-#         if len(members_df) == 0:
-#             members_df = pd.DataFrame(columns=[
-#                 'member_id', 'name', 'phone', 'address', 'dob', 'age',
-#                 'gender', 'next_of_kin_name', 'next_of_kin_phone',
-#                 'package', 'join_date', 'expiry_date', 'status'
-#             ])
-        
-#         packages_df = pd.read_excel('data/packages.xlsx')
-#         if len(packages_df) == 0:
-#             packages_df = pd.DataFrame(columns=['name', 'price', 'duration'])
-        
-#         # Convert to records safely
-#         members_list = []
-#         for _, row in members_df.iterrows():
-#             member_dict = {}
-#             for column in row.index:
-#                 value = row[column]
-#                 # Ensure value is a string before calling split
-#                 if pd.isna(value):
-#                     member_dict[column] = ''
-#                 else:
-#                     member_dict[column] = str(value) if column != 'age' else int(value) if pd.notna(value) else 0
-#             members_list.append(member_dict)
-        
-#         packages_list = packages_df.replace({pd.NA: None}).to_dict('records')
-        
-#         return render_template('members.html', 
-#                              members=members_list,
-#                              packages=packages_list,
-#                              user_type=session['user_type'])
-#     except Exception as e:
-#         app.logger.error(f"Error loading members: {e}")
-#         flash('Error loading members')
-#         return redirect(url_for('staff_dashboard'))
 @app.route('/view_members')
 def view_members():
     if 'user_type' not in session:
         return redirect(url_for('login'))
     
-    # Check if the user is admin or has 'members' privilege
     if session['user_type'] != 'admin' and 'members' not in session.get('privileges', []):
         flash('You do not have permission to view members')
         return redirect(url_for('staff_dashboard'))
@@ -278,6 +242,11 @@ def view_members():
     try:
         members_df = pd.read_excel('data/members.xlsx')
         packages_df = pd.read_excel('data/packages.xlsx')
+        
+        # Ensure member_id is included in the display
+        if 'member_id' not in members_df.columns:
+            members_df['member_id'] = range(1001, 1001 + len(members_df))
+            members_df.to_excel('data/members.xlsx', index=False)
         
         # Convert members DataFrame to list of dictionaries for template
         members = members_df.to_dict('records')
@@ -300,26 +269,37 @@ def edit_member(member_id):
     try:
         members_df = pd.read_excel('data/members.xlsx')
         packages_df = pd.read_excel('data/packages.xlsx')
-        member_data = members_df[members_df['id'].astype(str) == str(member_id)]
+        
+        # Convert member_id column to string and clean any NaN values
+        members_df['member_id'] = members_df['member_id'].fillna('').astype(str)
+        member_data = members_df[members_df['member_id'] == str(member_id)]
         
         if member_data.empty:
             flash('Member not found')
             return redirect(url_for('view_members'))
         
         if request.method == 'POST':
-            # Update member information
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'name'] = request.form.get('name')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'gender'] = request.form.get('gender')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'dob'] = request.form.get('dob')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'address'] = request.form.get('address')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'medical_conditions'] = request.form.get('medical_conditions')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'package'] = request.form.get('package')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'weight'] = request.form.get('weight')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'height'] = request.form.get('height')
+            # Create a mask for the specific member
+            mask = members_df['member_id'] == str(member_id)
             
-            # Update next of kin information
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'next_of_kin_name'] = request.form.get('next_of_kin_name')
-            members_df.loc[members_df['id'].astype(str) == str(member_id), 'next_of_kin_phone'] = request.form.get('next_of_kin_phone')
+            # Update member information using the mask
+            update_fields = {
+                'name': request.form.get('name'),
+                'phone': request.form.get('phone'),
+                'gender': request.form.get('gender'),
+                'dob': request.form.get('dob'),
+                'address': request.form.get('address'),
+                'medical_conditions': request.form.get('medical_conditions'),
+                'package': request.form.get('package'),
+                'weight': request.form.get('weight'),
+                'height': request.form.get('height'),
+                'next_of_kin_name': request.form.get('next_of_kin_name'),
+                'next_of_kin_phone': request.form.get('next_of_kin_phone')
+            }
+            
+            # Update all fields at once
+            for field, value in update_fields.items():
+                members_df.loc[mask, field] = value
             
             members_df.to_excel('data/members.xlsx', index=False)
             flash('Member updated successfully')
@@ -336,6 +316,7 @@ def edit_member(member_id):
         flash('Error updating member')
         return redirect(url_for('view_members'))
 
+
 @app.route('/members/delete/<member_id>')
 def delete_member(member_id):
     if 'user_type' not in session:
@@ -344,32 +325,25 @@ def delete_member(member_id):
     try:
         members_df = pd.read_excel('data/members.xlsx')
         
-        # Log the DataFrame before deletion for debugging
-        app.logger.debug(f"Members DataFrame before deletion:\n{members_df}")
+        # Convert member_id column to string and clean any NaN values
+        members_df['member_id'] = members_df['member_id'].fillna('').astype(str)
         
-        # Ensure the correct column name is used for filtering
-        if 'id' in members_df.columns:
-            members_df = members_df[members_df['id'].astype(str) != str(member_id)]
-        elif 'member_id' in members_df.columns:
-            members_df = members_df[members_df['member_id'].astype(str) != str(member_id)]
+        # Find the member to delete
+        member_mask = members_df['member_id'] == str(member_id)
+        
+        if any(member_mask):
+            # Delete the member
+            members_df = members_df[~member_mask]
+            members_df.to_excel('data/members.xlsx', index=False)
+            flash('Member deleted successfully')
         else:
-            flash('Member ID column not found')
-            return redirect(url_for('view_members'))
-        
-        # Log the DataFrame after deletion for debugging
-        app.logger.debug(f"Members DataFrame after deletion:\n{members_df}")
-        
-        # Save the updated DataFrame back to the Excel file
-        members_df.to_excel('data/members.xlsx', index=False)
-        flash('Member deleted successfully')
+            flash('Member not found')
+            
     except Exception as e:
         app.logger.error(f"Error deleting member: {e}")
         flash('Error deleting member')
     
     return redirect(url_for('view_members'))
-
-
-
 
 # Attendance routes
 @app.route('/attendance')
@@ -711,27 +685,35 @@ def add_member():
     try:
         members_df = pd.read_excel('data/members.xlsx')
         
-        # Get next of kin details separately
-        kin_name = request.form.get('kin_name')
-        kin_phone = request.form.get('kin_phone')
+        # Generate unique member ID
+        if members_df.empty or 'member_id' not in members_df.columns:
+            next_id = 1001
+        else:
+            # Convert member_id to numeric, handling any non-numeric values
+            valid_ids = pd.to_numeric(members_df['member_id'], errors='coerce')
+            next_id = int(valid_ids.max() + 1) if not valid_ids.empty else 1001
         
         new_member = {
+            'member_id': next_id,  # Ensure member_id is included
             'name': request.form.get('name'),
+            'phone': request.form.get('phone'),
             'gender': request.form.get('gender'),
             'dob': request.form.get('dob'),
-            'phone': request.form.get('phone'),
             'address': request.form.get('address'),
             'package': request.form.get('package'),
-            'join_date': datetime.now().strftime('%Y-%m-%d'),  # Automatic join date
-            'next_of_kin_name': kin_name,
-            'next_of_kin_phone': kin_phone,
+            'join_date': datetime.now().strftime('%Y-%m-%d'),
+            'next_of_kin_name': request.form.get('kin_name'),
+            'next_of_kin_phone': request.form.get('kin_phone'),
             'medical_conditions': request.form.get('medical_conditions'),
-            'weight': request.form.get('weight'),  # Added weight
-            'height': request.form.get('height'),  # Added height
-            'status': 'Active'
+            'weight': request.form.get('weight'),
+            'height': request.form.get('height'),
+            'status': 'Active',
+            'payment_status': 'Pending'  # Added payment status
         }
         
-        members_df = pd.concat([members_df, pd.DataFrame([new_member])], ignore_index=True)
+        # Create DataFrame with single row and concat
+        new_member_df = pd.DataFrame([new_member])
+        members_df = pd.concat([members_df, new_member_df], ignore_index=True)
         members_df.to_excel('data/members.xlsx', index=False)
         flash('Member added successfully')
         

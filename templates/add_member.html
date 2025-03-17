@@ -10,16 +10,22 @@
                 </div>
                 <div class="card-body">
                     <form action="{{ url_for('add_member') }}" method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">Name</label>
-                            <input type="text" class="form-control" name="name" required>
+                        <div class="form-group">
+                            <label for="name">Name</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Gender</label>
-                            <select class="form-control" name="gender" required>
+                        <div class="form-group">
+                            <label for="phone">Phone Number</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" required 
+                                   pattern="[0-9]{11}" placeholder="03XXXXXXXXX">
+                            <small class="form-text text-muted">Please enter a valid phone number (11 digits)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="gender">Gender</label>
+                            <select class="form-control" id="gender" name="gender" required>
+                                <option value="">Select Gender</option>
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
-                                <option value="Other">Other</option>
                             </select>
                         </div>
                         <div class="mb-3">

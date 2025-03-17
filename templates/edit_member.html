@@ -3,17 +3,26 @@
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <h2 class="text-2xl font-bold mb-6">Edit Member</h2>
-    <form action="{{ url_for('edit_member', member_id=member.id) }}" method="POST" class="max-w-lg">
+    <form method="POST" action="{{ url_for('edit_member', member_id=member.member_id) }}">
+        <input type="hidden" name="member_id" value="{{ member.member_id }}">
         <div class="mb-3">
             <label class="form-label">Name</label>
-            <input type="text" class="form-control" name="name" value="{{ member.name }}" required>
+            <input type="text" class="form-control" id="name" name="name" 
+                   value="{{ member.name }}" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Phone Number</label>
+            <input type="tel" class="form-control" id="phone" name="phone" 
+                   value="{{ member.phone }}" required pattern="[0-9]{11}" 
+                   placeholder="03XXXXXXXXX">
+            <small class="form-text text-muted">Please enter a valid phone number (11 digits)</small>
         </div>
         <div class="mb-3">
             <label class="form-label">Gender</label>
-            <select class="form-control" name="gender" required>
+            <select class="form-control" id="gender" name="gender" required>
+                <option value="">Select Gender</option>
                 <option value="Male" {% if member.gender == 'Male' %}selected{% endif %}>Male</option>
                 <option value="Female" {% if member.gender == 'Female' %}selected{% endif %}>Female</option>
-                <option value="Other" {% if member.gender == 'Other' %}selected{% endif %}>Other</option>
             </select>
         </div>
         <div class="mb-3">
