@@ -750,6 +750,97 @@ def add_member():
     
 #     return redirect(url_for('payments'))
 
+@app.route('/custom_product', methods=['GET'])
+def custom_product_page():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        inventory_df = pd.read_excel('data/inventory.xlsx')
+        return render_template('custom_product.html', 
+                             inventory=inventory_df.to_dict('records'),
+                             staff_name=session.get('username'))
+    except Exception as e:
+        app.logger.error(f"Error loading custom product page: {e}")
+        flash('Error loading inventory data')
+        return redirect(url_for('sales'))
+
+@app.route('/add_custom_product', methods=['POST'])
+def add_custom_product():
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        # Get form data
+        product_name = request.form.get('product_name')
+        ingredients_json = request.form.get('ingredients_json')
+        
+        # Check if required fields are present
+        if not product_name or not ingredients_json:
+            flash('Product name and ingredients are required')
+            return redirect(url_for('custom_product_page'))
+        
+        # Safely get and convert final_price with a default value
+        final_price_str = request.form.get('final_price')
+        if not final_price_str:
+            flash('Final price is required')
+            return redirect(url_for('custom_product_page'))
+            
+        try:
+            final_price = float(final_price_str)
+        except ValueError:
+            flash('Invalid price format')
+            return redirect(url_for('custom_product_page'))
+        
+        # Parse ingredients
+        try:
+            ingredients = json.loads(ingredients_json)
+        except json.JSONDecodeError:
+            flash('Invalid ingredients data')
+            return redirect(url_for('custom_product_page'))
+        
+        # Load inventory data
+        inventory_df = pd.read_excel('data/inventory.xlsx')
+        
+        # Calculate total cost
+        total_cost = 0
+        for ing in ingredients:
+            ing_price = float(ing.get('price', 0))
+            ing_quantity = float(ing.get('quantity', 0))
+            total_cost += ing_price * ing_quantity
+            
+        profit = final_price - total_cost
+        
+        # Generate new ID
+        new_id = int(inventory_df['id'].max() + 1) if not inventory_df.empty else 1001
+        
+        # Create new inventory item
+        new_product = {
+            'id': new_id,
+            'stock_type': product_name,
+            'servings': 1,
+            'cost_per_serving': total_cost,
+            'profit_per_serving': profit,
+            'other_charges': 0,
+            'date_added': datetime.now().strftime('%Y-%m-%d'),
+            'is_custom': 'Yes',
+            'recipe': ingredients_json,
+            'created_by': session.get('username', 'Unknown')
+        }
+        
+        # Add new product to inventory
+        inventory_df = pd.concat([inventory_df, pd.DataFrame([new_product])], ignore_index=True)
+        inventory_df.to_excel('data/inventory.xlsx', index=False)
+        
+        flash('Custom product added successfully')
+        return redirect(url_for('sales'))
+        
+    except Exception as e:
+        app.logger.error(f"Error adding custom product: {str(e)}")
+        flash(f'Error adding custom product: {str(e)}')
+        return redirect(url_for('sales'))
+
+
 
 
 @app.route('/payments/mark_as_paid', methods=['POST'])
@@ -1356,7 +1447,6 @@ def change_password():
             return redirect(url_for('change_password'))
     
     return render_template('change_password.html')
-
 
 
 if __name__ == '__main__':
