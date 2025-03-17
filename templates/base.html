@@ -25,7 +25,7 @@
                     </li>
                     {% endif %}
 
-                    {% if session.user_type == 'admin' or 'attendance' in session.get('privileges', []) %}
+                    {% if session.user_type == 'admin' or 'member_attendance' in session.get('privileges', []) %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('attendance') }}">Member Attendance</a>
                     </li>

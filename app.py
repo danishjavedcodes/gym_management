@@ -141,36 +141,27 @@ def login_post():
     return redirect(url_for('login'))
 
 @app.route('/staff/dashboard')
+@app.route('/staff_dashboard')
 def staff_dashboard():
     if 'user_type' not in session or session['user_type'] != 'staff':
         return redirect(url_for('login'))
     
     try:
-        receptionists_df = pd.read_excel('data/receptionists.xlsx')
-        staff = receptionists_df[receptionists_df['username'] == session['username']].iloc[0]
-        privileges = staff['privileges'].split(',') if isinstance(staff['privileges'], str) else []
+        # Get staff details including privileges
+        staff_df = pd.read_excel('data/receptionists.xlsx')
+        staff = staff_df[staff_df['username'] == session['username']].iloc[0]
         
-        # Get relevant data based on privileges
-        dashboard_data = {}
+        # Convert privileges string to list properly
+        privileges = []
+        if not pd.isna(staff['privileges']) and staff['privileges']:
+            privileges = [priv.strip() for priv in staff['privileges'].split(',')]
         
-        if 'members' in privileges:
-            members_df = pd.read_excel('data/members.xlsx')
-            dashboard_data['total_members'] = len(members_df)
+        # Store privileges in session
+        session['privileges'] = privileges
         
-        if 'payments' in privileges:
-            payments_df = pd.read_excel('data/payments.xlsx')
-            today = datetime.now().strftime('%Y-%m-%d')
-            dashboard_data['today_payments'] = len(payments_df[payments_df['date'] == today])
-        
-        if 'attendance' in privileges:
-            attendance_df = pd.read_excel('data/attendance.xlsx')
-            today = datetime.now().strftime('%Y-%m-%d')
-            dashboard_data['today_attendance'] = len(attendance_df[attendance_df['date'] == today])
-        
-        return render_template('staff/dashboard.html', 
-                             staff_name=staff['name'],
-                             privileges=privileges,
-                             dashboard_data=dashboard_data)
+        return render_template('staff/dashboard.html',
+                             staff=staff.to_dict(),
+                             privileges=privileges)
                              
     except Exception as e:
         app.logger.error(f"Error loading staff dashboard: {e}")
@@ -351,9 +342,8 @@ def attendance():
     if 'user_type' not in session:
         return redirect(url_for('login'))
     
-    # Fix: Changed member_attendance to attendance
-    if session['user_type'] != 'admin' and 'attendance' not in session.get('privileges', []):
-        flash('Access denied')
+    if 'member_attendance' not in session.get('privileges', []):
+        flash('Access Denied: You do not have permission to access this page')
         return redirect(url_for('staff_dashboard'))
     
     try:
@@ -820,8 +810,13 @@ def mark_payment_as_paid():
 # Receptionist management routes
 @app.route('/admin/receptionists')
 def manage_receptionists():
-    if 'user_type' not in session or session['user_type'] != 'admin':
+    if 'user_type' not in session:
         return redirect(url_for('login'))
+    
+    # Allow both admin and staff with staff management privilege
+    if session['user_type'] != 'admin' and 'staff' not in session.get('privileges', []):
+        flash('Access denied')
+        return redirect(url_for('staff_dashboard'))
     
     try:
         # Create file if it doesn't exist
@@ -834,7 +829,9 @@ def manage_receptionists():
             df.to_excel('data/receptionists.xlsx', index=False)
         
         staff_df = pd.read_excel('data/receptionists.xlsx')
-        return render_template('admin/staff.html', staff=staff_df.to_dict('records'))
+        return render_template('admin/staff.html', 
+                             staff=staff_df.to_dict('records'),
+                             is_admin=session['user_type'] == 'admin')
     except Exception as e:
         app.logger.error(f"Error loading staff data: {e}")
         flash('Error loading staff data')
@@ -887,8 +884,13 @@ def add_staff():
 
 @app.route('/admin/staff/edit/<username>', methods=['GET', 'POST'])
 def edit_staff(username):
-    if 'user_type' not in session or session['user_type'] != 'admin':
+    # Allow both admin and staff with staff management privilege
+    if 'user_type' not in session:
         return redirect(url_for('login'))
+    
+    if session['user_type'] != 'admin' and 'staff' not in session.get('privileges', []):
+        flash('Access denied')
+        return redirect(url_for('staff_dashboard'))
     
     try:
         receptionists_df = pd.read_excel('data/receptionists.xlsx')

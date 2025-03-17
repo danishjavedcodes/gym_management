@@ -1,68 +1,110 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-end mb-4">
-        <a href="{{ url_for('change_password') }}" class="btn btn-primary me-2">Change Password</a>
-        <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
-    </div>
-    <h2>Welcome, {{ session.username }}!</h2>
-    
-    <div class="row mt-4">
-        {% if 'members' in privileges %}
-        <div class="col-md-4 mb-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Members</h5>
-                    <a href="{{ url_for('view_members') }}" class="btn btn-primary">View Members</a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
+<style>
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        margin: 5px;
+        background-color: #2563eb;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+    }
+    .btn:hover {
+        background-color: #1d4ed8;
+    }
+    .privileges-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 20px;
+    }
+    .btn-secondary {
+        background-color: #64748b;
+    }
+    .btn-secondary:hover {
+        background-color: #475569;
+    }
+    .btn-danger {
+        background-color: #dc2626;
+    }
+    .btn-danger:hover {
+        background-color: #b91c1c;
+    }
+    .footer-buttons {
+        display: flex;
+        gap: 10px;
+        padding: 20px;
+        border-top: 1px solid #e5e7eb;
+    }
+    .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    .header-buttons {
+        display: flex;
+        gap: 10px;
+    }
+</style>
 
-        {% if 'attendance' in privileges %}
-        <div class="col-md-4 mb-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Member Attendance</h5>
-                    <a href="{{ url_for('attendance') }}" class="btn btn-primary">Member Attendance</a>
-                </div>
+<div class="min-h-screen bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="header-container">
+            <h1 class="text-3xl font-bold text-gray-900">Welcome, {{ staff.name }}!</h1>
+            <div class="header-buttons">
+                <a href="{{ url_for('change_password') }}" class="btn btn-secondary">Change Password</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
             </div>
         </div>
-        {% endif %}
 
-        {% if 'staff_attendance' in privileges %}
-        <div class="col-md-4 mb-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Staff Attendance</h5>
-                    <a href="{{ url_for('staff_attendance') }}" class="btn btn-primary">Staff Attendance</a>
-                </div>
+        <div class="bg-white shadow-md rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-800">Your Privileges</h2>
             </div>
-        </div>
-        {% endif %}
 
-        {% if 'packages' in privileges %}
-        <div class="col-md-4 mb-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Packages</h5>
-                    <a href="{{ url_for('packages') }}" class="btn btn-primary">View Packages</a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
+            <div class="privileges-container">
+                {% if 'members' in privileges %}
+                <a href="{{ url_for('view_members') }}" class="btn">View Members</a>
+                {% endif %}
 
-        {% if 'payments' in privileges %}
-        <div class="col-md-4 mb-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Payments</h5>
-                    <a href="{{ url_for('payments') }}" class="btn btn-primary">View Payments</a>
-                </div>
+                {% if 'member_attendance' in privileges %}
+                <a href="{{ url_for('attendance') }}" class="btn">Member Attendance</a>
+                {% endif %}
+
+                {% if 'staff_attendance' in privileges %}
+                <a href="{{ url_for('staff_attendance') }}" class="btn">Staff Attendance</a>
+                {% endif %}
+
+                {% if 'packages' in privileges %}
+                <a href="{{ url_for('packages') }}" class="btn">View Packages</a>
+                {% endif %}
+
+                {% if 'staff' in privileges %}
+                <a href="{{ url_for('manage_receptionists') }}" class="btn">Manage Staff</a>
+                {% endif %}
+
+                {% if 'inventory' in privileges %}
+                <a href="{{ url_for('inventory') }}" class="btn">Manage Inventory</a>
+                {% endif %}
+
+                {% if 'sales' in privileges %}
+                <a href="{{ url_for('sales') }}" class="btn">Manage Sales</a>
+                {% endif %}
+
+                {% if 'payments' in privileges %}
+                <a href="{{ url_for('payments') }}" class="btn">View Payments</a>
+                {% endif %}
+
+                {% if 'reports' in privileges %}
+                <a href="{{ url_for('reports') }}" class="btn">View Reports</a>
+                {% endif %}
             </div>
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
