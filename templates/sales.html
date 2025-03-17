@@ -319,12 +319,26 @@
                     <select class="form-control" id="item_select">
                         <option value="">-- Select an item to add --</option>
                         {% for item in inventory %}
-                        <option value="{{ item.id }}" 
-                                data-name="{{ item.stock_type }}"
-                                data-price="{{ item.cost_per_serving + item.profit_per_serving }}"
-                                data-max="{{ item.servings }}">
-                            {{ item.stock_type }} - ₹{{ item.cost_per_serving + item.profit_per_serving }}/serving ({{ item.servings }} available)
-                        </option>
+                            {% if item.is_custom == 'Yes' %}
+                                <option value="{{ item.id }}" 
+                                        data-name="{{ item.stock_type }}"
+                                        data-price="{{ item.cost_per_serving + item.profit_per_serving }}"
+                                        data-max="999"
+                                        data-custom="true"
+                                        {% if item.ingredients_available is defined and not item.ingredients_available %}disabled{% endif %}>
+                                    {{ item.stock_type }} - ₹{{ item.cost_per_serving + item.profit_per_serving }}/serving
+                                    {% if item.ingredients_available is defined and not item.ingredients_available %}(Ingredients unavailable){% endif %}
+                                </option>
+                            {% else %}
+                                <option value="{{ item.id }}" 
+                                        data-name="{{ item.stock_type }}"
+                                        data-price="{{ item.cost_per_serving + item.profit_per_serving }}"
+                                        data-max="{{ item.servings }}"
+                                        data-custom="false"
+                                        {% if item.servings|int <= 0 %}disabled{% endif %}>
+                                    {{ item.stock_type }} - ₹{{ item.cost_per_serving + item.profit_per_serving }}/serving ({{ item.servings }} available)
+                                </option>
+                            {% endif %}
                         {% endfor %}
                     </select>
                 </div>

@@ -1250,6 +1250,35 @@ def sales():
         sales_df = sales_df.sort_values(by='date', ascending=False)
         inventory_df = pd.read_excel('data/inventory.xlsx')
         
+        # Process inventory items to check custom product ingredient availability
+        inventory_items = []
+        for _, item in inventory_df.iterrows():
+            item_dict = item.to_dict()
+            
+            # For custom products, check ingredient availability
+            if item_dict.get('is_custom') == 'Yes' and item_dict.get('recipe'):
+                try:
+                    recipe = json.loads(item_dict['recipe'])
+                    all_ingredients_available = True
+                    
+                    for ingredient in recipe:
+                        ing_id = ingredient['id']
+                        ing_quantity = float(ingredient['quantity'])
+                        
+                        # Find ingredient in inventory
+                        ing_rows = inventory_df[inventory_df['id'].astype(str) == str(ing_id)]
+                        if ing_rows.empty or float(ing_rows.iloc[0]['servings']) < ing_quantity:
+                            all_ingredients_available = False
+                            break
+                    
+                    # Set availability flag for template
+                    item_dict['ingredients_available'] = all_ingredients_available
+                except Exception as e:
+                    app.logger.error(f"Error checking custom product ingredients: {e}")
+                    item_dict['ingredients_available'] = False
+            
+            inventory_items.append(item_dict)
+        
         # Get current user info
         current_user = {
             'username': session['username'],
@@ -1265,11 +1294,12 @@ def sales():
         return render_template('sales.html',
                              sales=sales_df.to_dict('records'),
                              current_user=current_user,
-                             inventory=inventory_df.to_dict('records'))
+                             inventory=inventory_items)
     except Exception as e:
         app.logger.error(f"Error loading sales data: {e}")
         flash('Error loading sales data')
         return redirect(url_for('login'))
+
 
 @app.route('/sales/add', methods=['POST'])
 def add_sale():
@@ -1280,16 +1310,7 @@ def add_sale():
         sales_df = pd.read_excel('data/sales.xlsx')
         inventory_df = pd.read_excel('data/inventory.xlsx')
         
-        # Use logged-in user's information
-        staff_username = session['username']
-        staff_name = 'Admin' if session['user_type'] == 'admin' else None
-        
-        # Get receptionist name if not admin
-        if session['user_type'] != 'admin':
-            staff_df = pd.read_excel('data/receptionists.xlsx')
-            staff = staff_df[staff_df['username'] == staff_username].iloc[0]
-            staff_name = staff['name']
-        
+        # Get form data
         payment_method = request.form.get('payment_method')
         total_amount = float(request.form.get('total_amount'))
         selected_items_json = request.form.get('selected_items')
@@ -1332,24 +1353,73 @@ def add_sale():
                 'total': item_total
             })
             
-            # Update inventory (reduce servings)
-            remaining_servings = int(item['servings']) - quantity
-            if remaining_servings < 0:
-                flash(f'Not enough servings available for {item["stock_type"]}')
-                return redirect(url_for('sales'))
+            # Check if this is a custom product
+            is_custom = item.get('is_custom') == 'Yes' and item.get('recipe')
             
-            inventory_df.loc[inventory_df['id'].astype(str) == str(item_id), 'servings'] = remaining_servings
+            if is_custom:
+                # Process custom product - deduct ingredients
+                try:
+                    recipe = json.loads(item['recipe'])
+                    
+                    # Check if enough ingredients are available
+                    for ingredient in recipe:
+                        ing_id = ingredient['id']
+                        ing_quantity = float(ingredient['quantity']) * quantity
+                        
+                        # Find ingredient in inventory
+                        ing_rows = inventory_df[inventory_df['id'].astype(str) == str(ing_id)]
+                        if ing_rows.empty:
+                            flash(f"Ingredient with ID {ing_id} not found for custom product {item['stock_type']}")
+                            return redirect(url_for('sales'))
+                            
+                        current_servings = float(ing_rows.iloc[0]['servings'])
+                        if current_servings < ing_quantity:
+                            flash(f"Not enough {ing_rows.iloc[0]['stock_type']} available for custom product {item['stock_type']}")
+                            return redirect(url_for('sales'))
+                    
+                    # Deduct ingredients from inventory
+                    for ingredient in recipe:
+                        ing_id = ingredient['id']
+                        ing_quantity = float(ingredient['quantity']) * quantity
+                        
+                        # Update inventory for this ingredient
+                        ing_index = inventory_df.index[inventory_df['id'].astype(str) == str(ing_id)].tolist()[0]
+                        current_servings = float(inventory_df.at[ing_index, 'servings'])
+                        inventory_df.at[ing_index, 'servings'] = current_servings - ing_quantity
+                except Exception as e:
+                    app.logger.error(f"Error processing custom product: {e}")
+                    flash(f"Error processing custom product: {str(e)}")
+                    return redirect(url_for('sales'))
+            else:
+                # Regular product - check if enough servings
+                if int(item['servings']) < quantity:
+                    flash(f"Not enough servings available for {item['stock_type']}")
+                    return redirect(url_for('sales'))
+                
+                # Update inventory for regular product
+                item_index = inventory_df.index[inventory_df['id'].astype(str) == str(item_id)].tolist()[0]
+                inventory_df.at[item_index, 'servings'] = int(item['servings']) - quantity
         
         # Save updated inventory
         inventory_df.to_excel('data/inventory.xlsx', index=False)
         
-        # Record the sale with detailed information
+        # Get staff info
+        staff_username = session['username']
+        staff_name = 'Admin' if session['user_type'] == 'admin' else None
+        
+        # If not admin, get receptionist name
+        if session['user_type'] != 'admin':
+            staff_df = pd.read_excel('data/receptionists.xlsx')
+            staff = staff_df[staff_df['username'] == staff_username].iloc[0]
+            staff_name = staff['name']
+        
+        # Record the sale
         new_sale = {
             'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'staff_username': staff_username,
             'staff_name': staff_name,
             'items': ', '.join(items_description),
-            'items_details': json.dumps(items_details),  # Store detailed information as JSON
+            'items_details': json.dumps(items_details),
             'total_amount': total_amount,
             'payment_method': payment_method
         }
@@ -1358,11 +1428,13 @@ def add_sale():
         sales_df.to_excel('data/sales.xlsx', index=False)
         
         flash('Sale recorded successfully')
+        return redirect(url_for('sales'))
     except Exception as e:
         app.logger.error(f"Error recording sale: {e}")
         flash(f'Error recording sale: {str(e)}')
-    
-    return redirect(url_for('sales'))
+        return redirect(url_for('sales'))
+
+
 
 @app.route('/sales/report')
 def sales_report():
