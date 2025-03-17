@@ -90,26 +90,33 @@ def login_post():
     username = request.form.get('username')
     password = request.form.get('password')
     
-    if username == 'admin' and password == 'admin':
-        session.permanent = True
-        session['user_type'] = 'admin'
-        session['username'] = 'admin'
-        return redirect(url_for('admin_dashboard'))
-    
     try:
+        # Check admin login
+        admin_df = pd.read_excel('data/admin.xlsx')
+        admin = admin_df[
+            (admin_df['username'].astype(str).str.lower() == str(username).lower()) & 
+            (admin_df['password'].astype(str) == str(password))
+        ]
+        
+        if not admin.empty:
+            session.permanent = True
+            session['user_type'] = 'admin'
+            session['username'] = username
+            return redirect(url_for('admin_dashboard'))
+        
+        # Check staff login
         receptionists = pd.read_excel('data/receptionists.xlsx')
         receptionist = receptionists[
-            (receptionists['username'] == username) & 
-            (receptionists['password'] == password)
+            (receptionists['username'].astype(str) == str(username)) & 
+            (receptionists['password'].astype(str) == str(password))
         ]
         
         if not receptionist.empty:
             session.permanent = True
             session['user_type'] = 'staff'
             session['username'] = username
-            # Fix privilege handling
             privileges_str = receptionist.iloc[0]['privileges']
-            if pd.isna(privileges_str):  # Check for NaN values
+            if pd.isna(privileges_str):
                 session['privileges'] = []
             else:
                 session['privileges'] = [p.strip() for p in privileges_str.split(',') if p.strip()]
@@ -121,7 +128,6 @@ def login_post():
         flash('Error during login')
     
     return redirect(url_for('login'))
-
 
 @app.route('/staff/dashboard')
 def staff_dashboard():
