@@ -77,24 +77,49 @@
                 <div class="mb-3">
                     <label class="form-label">Permissions</label>
                     <div class="form-check">
-                        <input type="checkbox" class="form-check-input" name="perm_members" {% if 'members' in staff.privileges %}checked{% endif %}>
-                        <label class="form-check-label">Members Management</label>
+                        <input type="checkbox" class="form-check-input" name="perm_members" 
+                               {% if 'members' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Members</label>
                     </div>
                     <div class="form-check">
-                        <input type="checkbox" class="form-check-input" name="perm_attendance" {% if 'attendance' in staff.privileges %}checked{% endif %}>
-                        <label class="form-check-label">Attendance Management</label>
+                        <input type="checkbox" class="form-check-input" name="perm_member_attendance" 
+                               {% if 'member_attendance' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Member Attendance</label>
                     </div>
                     <div class="form-check">
-                        <input type="checkbox" class="form-check-input" name="perm_payments" {% if 'payments' in staff.privileges %}checked{% endif %}>
-                        <label class="form-check-label">Payments Management</label>
+                        <input type="checkbox" class="form-check-input" name="perm_staff_attendance" 
+                               {% if 'staff_attendance' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Staff Attendance</label>
                     </div>
                     <div class="form-check">
-                        <input type="checkbox" class="form-check-input" name="perm_packages" {% if 'packages' in staff.privileges %}checked{% endif %}>
-                        <label class="form-check-label">Packages Management</label>
+                        <input type="checkbox" class="form-check-input" name="perm_payments" 
+                               {% if 'payments' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Payments</label>
                     </div>
                     <div class="form-check">
-                        <input type="checkbox" class="form-check-input" name="perm_reports" {% if 'reports' in staff.privileges %}checked{% endif %}>
-                        <label class="form-check-label">Reports Access</label>
+                        <input type="checkbox" class="form-check-input" name="perm_reports" 
+                               {% if 'reports' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">View Reports</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_staff" 
+                               {% if 'staff' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Staff</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_sales" 
+                               {% if 'sales' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Sales</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_inventory" 
+                               {% if 'inventory' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Inventory</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_packages" 
+                               {% if 'packages' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Packages</label>
                     </div>
                 </div>
 

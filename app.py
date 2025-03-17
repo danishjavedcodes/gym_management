@@ -900,17 +900,24 @@ def edit_staff(username):
             
         if request.method == 'GET':
             staff = staff_data.iloc[0].to_dict()
-            # Convert privileges string to list
-            staff['privileges'] = staff['privileges'].split(',') if isinstance(staff['privileges'], str) else []
+            # Convert privileges string to list, handling empty or None values
+            if pd.isna(staff['privileges']) or staff['privileges'] == '':
+                staff['privileges'] = []
+            else:
+                staff['privileges'] = staff['privileges'].split(',')
             return render_template('admin/edit_staff.html', staff=staff)
         
-        # Handle POST request
+        # Handle POST request - Updated permissions list
         permissions = []
-        if request.form.get('perm_members'): permissions.append('members')
-        if request.form.get('perm_attendance'): permissions.append('attendance')
-        if request.form.get('perm_payments'): permissions.append('payments')
-        if request.form.get('perm_packages'): permissions.append('packages')
-        if request.form.get('perm_reports'): permissions.append('reports')
+        permission_fields = [
+            'perm_members', 'perm_member_attendance', 'perm_staff_attendance',
+            'perm_payments', 'perm_reports', 'perm_staff', 'perm_sales', 
+            'perm_inventory', 'perm_packages'
+        ]
+        
+        for perm in permission_fields:
+            if request.form.get(perm):
+                permissions.append(perm.replace('perm_', ''))
         
         # Update staff information
         mask = receptionists_df['username'] == username
@@ -936,9 +943,10 @@ def edit_staff(username):
         return redirect(url_for('manage_receptionists'))
         
     except Exception as e:
-        app.logger.error(f"Error updating staff member: {e}")
+        app.logger.error(f"Error updating staff member: {str(e)}")
         flash(f'Error updating staff member: {str(e)}')
         return redirect(url_for('manage_receptionists'))
+
 
 @app.route('/admin/receptionists/delete/<username>')
 def delete_receptionist(username):

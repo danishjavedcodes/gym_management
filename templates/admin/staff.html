@@ -195,27 +195,39 @@
                     </div>
 
                     <!-- Existing permissions section -->
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label">Permissions</label>
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" id="perm_members" name="perm_members">
-                            <label class="form-check-label" for="perm_members">Members Management</label>
+                            <label class="form-check-label" for="perm_members">Manage Members</label>
                         </div>
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" id="perm_member_attendance" name="perm_member_attendance">
-                            <label class="form-check-label" for="perm_member_attendance">Member Attendance Management</label>
+                            <label class="form-check-label" for="perm_member_attendance">Member Attendance</label>
                         </div>
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" id="perm_staff_attendance" name="perm_staff_attendance">
-                            <label class="form-check-label" for="perm_staff_attendance">Staff Attendance Management</label>
+                            <label class="form-check-label" for="perm_staff_attendance">Staff Attendance</label>
                         </div>
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" id="perm_payments" name="perm_payments">
-                            <label class="form-check-label" for="perm_payments">Payments Management</label>
+                            <label class="form-check-label" for="perm_payments">Manage Payments</label>
                         </div>
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" id="perm_reports" name="perm_reports">
-                            <label class="form-check-label" for="perm_reports">Reports Access</label>
+                            <label class="form-check-label" for="perm_reports">View Reports</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_staff" name="perm_staff">
+                            <label class="form-check-label" for="perm_staff">Manage Staff</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_sales" name="perm_sales">
+                            <label class="form-check-label" for="perm_sales">Manage Sales</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_inventory" name="perm_inventory">
+                            <label class="form-check-label" for="perm_inventory">Manage Inventory</label>
                         </div>
                     </div>
 
@@ -319,23 +331,35 @@ function toggleOtherType() {
                         <label class="form-label">Permissions</label>
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" name="perm_members" id="edit_perm_members_{{ member.username }}" {% if 'members' in member.privileges %}checked{% endif %}>
-                            <label class="form-check-label" for="edit_perm_members_{{ member.username }}">Members Management</label>
+                            <label class="form-check-label" for="edit_perm_members_{{ member.username }}">Manage Members</label>
                         </div>
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="perm_attendance" id="edit_perm_attendance_{{ member.username }}" {% if 'attendance' in member.privileges %}checked{% endif %}>
-                            <label class="form-check-label" for="edit_perm_attendance_{{ member.username }}">Attendance Management</label>
+                            <input type="checkbox" class="form-check-input" name="perm_member_attendance" id="edit_perm_member_attendance_{{ member.username }}" {% if 'member_attendance' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_member_attendance_{{ member.username }}">Member Attendance</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_staff_attendance" id="edit_perm_staff_attendance_{{ member.username }}" {% if 'staff_attendance' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_staff_attendance_{{ member.username }}">Staff Attendance</label>
                         </div>
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" name="perm_payments" id="edit_perm_payments_{{ member.username }}" {% if 'payments' in member.privileges %}checked{% endif %}>
-                            <label class="form-check-label" for="edit_perm_payments_{{ member.username }}">Payments Management</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="perm_packages" id="edit_perm_packages_{{ member.username }}" {% if 'packages' in member.privileges %}checked{% endif %}>
-                            <label class="form-check-label" for="edit_perm_packages_{{ member.username }}">Packages Management</label>
+                            <label class="form-check-label" for="edit_perm_payments_{{ member.username }}">Manage Payments</label>
                         </div>
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" name="perm_reports" id="edit_perm_reports_{{ member.username }}" {% if 'reports' in member.privileges %}checked{% endif %}>
-                            <label class="form-check-label" for="edit_perm_reports_{{ member.username }}">Reports Access</label>
+                            <label class="form-check-label" for="edit_perm_reports_{{ member.username }}">View Reports</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_staff" id="edit_perm_staff_{{ member.username }}" {% if 'staff' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_staff_{{ member.username }}">Manage Staff</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_sales" id="edit_perm_sales_{{ member.username }}" {% if 'sales' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_sales_{{ member.username }}">Manage Sales</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_inventory" id="edit_perm_inventory_{{ member.username }}" {% if 'inventory' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_inventory_{{ member.username }}">Manage Inventory</label>
                         </div>
                     </div>
 
