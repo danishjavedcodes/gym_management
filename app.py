@@ -1593,6 +1593,13 @@ def sales():
     
 #     return redirect(url_for('sales'))
 
+import json
+
+@app.template_filter('from_json')
+def from_json(value):
+    return json.loads(value)
+
+
 @app.route('/sales/add', methods=['POST'])
 def add_sale():
     if 'user_type' not in session:
