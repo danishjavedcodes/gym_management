@@ -2,454 +2,189 @@
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <!-- Add this button next to the Back to Dashboard button -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="text-2xl font-bold">Inventory Sales</h2>
-        <div>
-            <!-- Replace the existing custom product button with this -->
-            <!-- Add this button somewhere appropriate in your sales.html template -->
-            <a href="{{ url_for('custom_product_page') }}" class="btn btn-primary">Create Custom Product</a>
-            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Dashboard
-            </a>
-        </div>
+        <h2 class="text-2xl font-bold">Sales</h2>
+        <a href="{{ url_for('admin_dashboard' if session.user_type == 'admin' else 'staff_dashboard') }}" class="btn btn-secondary">
+            Back to Dashboard
+        </a>
     </div>
-    
-    <!-- Add this modal before the closing </div> of the container -->
-    <div class="modal fade" id="customProductModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Create Custom Product</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+
+    <!-- Split into two forms: one for adding items and one for completing sale -->
+    <form method="POST" action="{{ url_for('sales') }}">
+        <!-- Item Selection -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title">Select Items</h3>
+            </div>
+            <div class="card-body">
+                {% for i in range(item_count) %}
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Item {{ i + 1 }}</label>
+                        <select name="item_id_{{ i }}" class="form-select" required>
+                            <option value="">Select an item</option>
+                            <optgroup label="Regular Items">
+                                {% for item in inventory %}
+                                {% if item.remaining_servings > 0 %}
+                                <option value="R_{{ item.id }}" {% if request.form.get('item_id_' ~ i) == 'R_' ~ item.id|string %}selected{% endif %}>
+                                    {{ item.stock_type }} - ₹{{ item.cost_per_serving + item.profit_per_serving }} 
+                                    ({{ item.remaining_servings }} servings available)
+                                </option>
+                                {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Custom Products">
+                                {% for product in custom_products %}
+                                {% if product.can_be_sold %}
+                                <option value="C_{{ product.product_id }}" {% if request.form.get('item_id_' ~ i) == 'C_' ~ product.product_id|string %}selected{% endif %}>
+                                    {{ product.product_name }} - ₹{{ product.final_price }}
+                                    {% if product.inventory_status %}
+                                    <small class="text-muted">(All ingredients available)</small>
+                                    {% endif %}
+                                </option>
+                                {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" name="quantity_{{ i }}" class="form-control" min="1" 
+                               value="{{ request.form.get('quantity_' ~ i, '1') }}" required>
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <form id="customProductForm">
-                        <!-- Add staff name at the top -->
-                        <div class="mb-3">
-                            <label class="form-label">Staff</label>
-                            <input type="text" class="form-control" value="{{ current_user.name }}" readonly>
-                            <input type="hidden" name="staff_username" value="{{ current_user.username }}">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Product Name</label>
-                            <input type="text" class="form-control" id="customProductName" required>
-                        </div>
-                        <!-- Update the ingredients list section in the custom product modal -->
-                        <div id="ingredientsList">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th>Price/Serving</th>
-                                        <th>Quantity</th>
-                                        <th>Subtotal</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr id="no_ingredients_row">
-                                        <td colspan="5" class="text-center">No ingredients added</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-8">
-                                <select class="form-select" id="ingredient-select">
-                                    <option value="">-- Select an ingredient to add --</option>
-                                    {% for item in inventory %}
-                                    <option value="{{ item.id }}" 
-                                            data-name="{{ item.stock_type }}"
-                                            data-price="{{ item.cost_per_serving + item.profit_per_serving }}"
-                                            data-max="{{ item.servings }}">
-                                        {{ item.stock_type }} - ₹{{ item.cost_per_serving + item.profit_per_serving }}/serving ({{ item.servings }} available)
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <input type="number" class="form-control" id="ingredient-quantity" min="1" value="1">
-                            </div>
-                            <div class="col-md-2">
-                                <button type="button" class="btn btn-success form-control" id="add-ingredient-btn">Add</button>
-                            </div>
-                        </div>
-                        
-                        <!-- Add this to your existing script section -->
-                        <script>
-                        // Add this after your existing script
-                        document.addEventListener('DOMContentLoaded', function() {
-                            const ingredientSelect = document.getElementById('ingredient-select');
-                            const ingredientQuantity = document.getElementById('ingredient-quantity');
-                            const addIngredientBtn = document.getElementById('add-ingredient-btn');
-                            const ingredientsTable = document.getElementById('ingredientsList').querySelector('tbody');
-                            const noIngredientsRow = document.getElementById('no_ingredients_row');
-                            const calculatedPriceInput = document.getElementById('calculatedPrice');
-                            const finalPriceInput = document.getElementById('finalPrice');
-                            
-                            const selectedIngredients = [];
-                            
-                            addIngredientBtn.addEventListener('click', function() {
-                                const selectedOption = ingredientSelect.options[ingredientSelect.selectedIndex];
-                                if (!selectedOption.value) {
-                                    alert('Please select an ingredient');
-                                    return;
-                                }
-                                
-                                const itemId = selectedOption.value;
-                                const itemName = selectedOption.dataset.name;
-                                const itemPrice = parseFloat(selectedOption.dataset.price);
-                                const maxQuantity = parseInt(selectedOption.dataset.max);
-                                let quantity = parseInt(ingredientQuantity.value) || 1;
-                                
-                                // Validate quantity
-                                if (quantity < 1) {
-                                    quantity = 1;
-                                    ingredientQuantity.value = 1;
-                                }
-                                if (quantity > maxQuantity) {
-                                    quantity = maxQuantity;
-                                    ingredientQuantity.value = maxQuantity;
-                                    alert(`Only ${maxQuantity} servings available for ${itemName}`);
-                                }
-                                
-                                // Check if ingredient already exists
-                                const existingIndex = selectedIngredients.findIndex(item => item.id === itemId);
-                                if (existingIndex !== -1) {
-                                    const existingItem = selectedIngredients[existingIndex];
-                                    const newQuantity = existingItem.quantity + quantity;
-                                    
-                                    if (newQuantity > maxQuantity) {
-                                        alert(`Cannot add more. You already have ${existingItem.quantity} of ${itemName}`);
-                                        return;
-                                    }
-                                    
-                                    existingItem.quantity = newQuantity;
-                                    existingItem.subtotal = newQuantity * itemPrice;
-                                    
-                                    // Update table row
-                                    const rows = ingredientsTable.querySelectorAll('tr[data-id]');
-                                    for (let row of rows) {
-                                        if (row.dataset.id === itemId) {
-                                            row.querySelector('.ingredient-quantity').textContent = newQuantity;
-                                            row.querySelector('.ingredient-subtotal').textContent = `₹${existingItem.subtotal.toFixed(2)}`;
-                                            break;
-                                        }
-                                    }
-                                } else {
-                                    // Add new ingredient
-                                    const subtotal = quantity * itemPrice;
-                                    const newItem = {
-                                        id: itemId,
-                                        name: itemName,
-                                        price: itemPrice,
-                                        quantity: quantity,
-                                        subtotal: subtotal
-                                    };
-                                    
-                                    selectedIngredients.push(newItem);
-                                    
-                                    if (selectedIngredients.length === 1) {
-                                        noIngredientsRow.style.display = 'none';
-                                    }
-                                    
-                                    const newRow = document.createElement('tr');
-                                    newRow.dataset.id = itemId;
-                                    newRow.innerHTML = `
-                                        <td>${itemName}</td>
-                                        <td>₹${itemPrice.toFixed(2)}</td>
-                                        <td class="ingredient-quantity">${quantity}</td>
-                                        <td class="ingredient-subtotal">₹${subtotal.toFixed(2)}</td>
-                                        <td>
-                                            <button type="button" class="btn btn-sm btn-danger remove-ingredient" data-id="${itemId}">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </td>
-                                    `;
-                                    ingredientsTable.appendChild(newRow);
-                                    
-                                    newRow.querySelector('.remove-ingredient').addEventListener('click', function() {
-                                        removeIngredient(this.dataset.id);
-                                    });
-                                }
-                                
-                                // Reset selection
-                                ingredientSelect.selectedIndex = 0;
-                                ingredientQuantity.value = 1;
-                                
-                                // Update total price
-                                updateCustomProductTotal();
-                            });
-                            
-                            function removeIngredient(itemId) {
-                                const index = selectedIngredients.findIndex(item => item.id === itemId);
-                                if (index !== -1) {
-                                    selectedIngredients.splice(index, 1);
-                                    
-                                    const row = ingredientsTable.querySelector(`tr[data-id="${itemId}"]`);
-                                    if (row) {
-                                        row.remove();
-                                    }
-                                    
-                                    if (selectedIngredients.length === 0) {
-                                        noIngredientsRow.style.display = '';
-                                    }
-                                    
-                                    updateCustomProductTotal();
-                                }
-                            }
-                            
-                            function updateCustomProductTotal() {
-                                let total = 0;
-                                selectedIngredients.forEach(item => {
-                                    total += item.subtotal;
-                                });
-                                
-                                calculatedPriceInput.value = total.toFixed(2);
-                                finalPriceInput.value = total.toFixed(2);
-                            }
-                        });
-                        </script>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Calculated Price</label>
-                                <input type="number" class="form-control" id="calculatedPrice" readonly>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Final Price (Adjustable)</label>
-                                <input type="number" class="form-control" id="finalPrice" step="0.01">
-                            </div>
-                        </div>
-                    </form>
+                {% endfor %}
+
+                <!-- Add More Items Button -->
+                <div class="mt-3">
+                    <button type="submit" name="add_more_items" value="1" class="btn btn-secondary">
+                        Add More Items
+                    </button>
                 </div>
-                <!-- Add this in the modal footer -->
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="saveCustomProduct">Save Product</button>
-                </div>
-                
-                <!-- Move this script to the main script section -->
-                <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    // Update the save custom product event listener
-                    document.getElementById('saveCustomProduct').addEventListener('click', function() {
-                        const productName = document.getElementById('customProductName').value;
-                        const staffName = document.querySelector('input[name="staff_username"]').value;
-                        const finalPrice = parseFloat(document.getElementById('finalPrice').value);
-                        
-                        if (!productName || selectedIngredients.length === 0 || !finalPrice) {
-                            alert('Please enter product name, add ingredients, and set a final price');
-                            return;
-                        }
-                        
-                        const data = {
-                            product_name: productName,
-                            staff_name: staffName,
-                            ingredients: selectedIngredients.map(item => ({
-                                id: item.id,
-                                name: item.name,
-                                quantity: item.quantity,
-                                price: item.price
-                            })),
-                            final_price: finalPrice
-                        };
-                        
-                        fetch('/add_custom_product', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify(data)
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                alert('Custom product saved successfully');
-                                window.location.href = '/sales';  // Redirect to sales page
-                            } else {
-                                alert('Error: ' + data.message);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error:', error);
-                            alert('Error saving custom product');
-                        });
-                    });
-                });
-                </script>
             </div>
         </div>
-    </div>
-    
-    <!-- Record New Sale Form -->
+    </form>
+
+    <form method="POST" action="{{ url_for('add_sale') }}">
+        <!-- Transfer current items data -->
+        {% for i in range(item_count) %}
+            <input type="hidden" name="item_id_{{ i }}" value="{{ request.form.get('item_id_' ~ i, '') }}">
+            <input type="hidden" name="quantity_{{ i }}" value="{{ request.form.get('quantity_' ~ i, '1') }}">
+        {% endfor %}
+
+        <!-- Payment Method -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title">Payment Method (Optional)</h3>
+            </div>
+            <div class="card-body">
+                <div class="col-md-6">
+                    <select name="payment_method" class="form-select">
+                        <option value="">Select Payment Method</option>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                        <option value="upi">UPI</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Complete Sale Button -->
+        <div class="mb-4">
+            <button type="submit" name="complete_sale" value="1" class="btn btn-success btn-lg">
+                Complete Sale
+            </button>
+        </div>
+    </form>
+
+    <!-- Display Receipt after sale -->
+    {% if receipt %}
     <div class="card mb-4">
-        <div class="card-header">
-            <h4>Record New Sale</h4>
+        <div class="card-header bg-success text-white">
+            <h3 class="card-title">Sale Receipt</h3>
         </div>
         <div class="card-body">
-            <form action="{{ url_for('add_sale') }}" method="post" id="saleForm">
-                <div class="mb-3">
-                    <label class="form-label">Staff</label>
-                    <input type="text" class="form-control" value="{{ current_user.name }}" readonly>
-                    <input type="hidden" name="staff_username" value="{{ current_user.username }}">
+            <div class="receipt-content">
+                <!-- Receipt Header -->
+                <div class="text-center mb-4">
+                    <h4>Gym Management System</h4>
+                    <p>Receipt #{{ receipt.id }}</p>
+                    <p>Date: {{ receipt.date }}</p>
+                    <p>Staff: {{ receipt.staff_name }}</p>
                 </div>
-                <div class="col-md-4">
-                    <label for="payment_method">Payment Method</label>
-                    <select class="form-control" id="payment_method" name="payment_method" required>
-                        <option value="Cash">Cash</option>
-                        <option value="Card">Card</option>
-                        <option value="Online Transfer">Online Transfer</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label for="total_amount">Total Amount (₹)</label>
-                    <input type="number" step="0.01" class="form-control" id="total_amount" name="total_amount" readonly>
-                </div>
-            </div>
-            
-            <!-- Regular Items Section -->
-            <div class="row mb-3">
-                <div class="col-md-8">
-                    <label for="item_select">Select Regular Item</label>
-                    <select class="form-control" id="item_select">
-                        <option value="">-- Select an item to add --</option>
-                        {% for item in inventory %}
-                            {% if not item.is_custom %}
-                                <option value="{{ item.id }}" 
-                                        data-name="{{ item.stock_type }}"
-                                        data-price="{{ item.cost_per_serving + item.profit_per_serving }}"
-                                        data-max="{{ item.servings }}"
-                                        {% if item.servings|int <= 0 %}disabled{% endif %}>
-                                    {{ item.stock_type }} - ₹{{ item.cost_per_serving + item.profit_per_serving }}/serving ({{ item.servings }} available)
-                                </option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label for="item_quantity">Quantity</label>
-                    <input type="number" class="form-control" id="item_quantity" min="1" value="1">
-                </div>
-                <div class="col-md-2">
-                    <label>&nbsp;</label>
-                    <button type="button" class="btn btn-success form-control" id="add_item_btn">Add Item</button>
-                </div>
-            </div>
 
-            <!-- Regular Items Table -->
-            <div class="table-responsive mb-4">
-                <h5>Regular Items</h5>
-                <table class="table table-striped" id="selected_items_table">
+                <!-- Items Table -->
+                <table class="table table-bordered">
                     <thead>
                         <tr>
                             <th>Item</th>
-                            <th>Price/Serving</th>
                             <th>Quantity</th>
-                            <th>Subtotal</th>
-                            <th>Action</th>
+                            <th>Price</th>
+                            <th>Total</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr id="no_items_row">
-                            <td colspan="5" class="text-center">No items selected</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Custom Products Section -->
-            <div class="row mb-3">
-                <div class="col-md-8">
-                    <label for="customProductSelect">Select Custom Product</label>
-                    <select id="customProductSelect" class="form-control">
-                        <option value="">-- Select a custom product --</option>
-                        {% for product in custom_products %}
-                        <option value="{{ product.product_id }}" 
-                                data-price="{{ product.final_price }}"
-                                data-name="{{ product.product_name }}">
-                            {{ product.product_name }} - Rs.{{ product.final_price }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label for="custom_quantity">Quantity</label>
-                    <input type="number" class="form-control" id="custom_quantity" min="1" value="1">
-                </div>
-                <div class="col-md-2">
-                    <label>&nbsp;</label>
-                    <button type="button" class="btn btn-success form-control" id="add_custom_btn">Add Product</button>
-                </div>
-            </div>
-
-            <!-- Custom Products Table -->
-            <div class="table-responsive mb-4">
-                <h5>Custom Products</h5>
-                <table class="table table-striped" id="selected_custom_table">
-                    <thead>
+                        {% for item in receipt.items %}
                         <tr>
-                            <th>Custom Product</th>
-                            <th>Price/Serving</th>
-                            <th>Quantity</th>
-                            <th>Subtotal</th>
-                            <th>Action</th>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>₹{{ "%.2f"|format(item.price) }}</td>
+                            <td>₹{{ "%.2f"|format(item.total) }}</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        <tr id="no_custom_row">
-                            <td colspan="5" class="text-center">No custom products selected</td>
+                        {% endfor %}
+                        <tr class="table-info">
+                            <td colspan="3" class="text-end"><strong>Grand Total:</strong></td>
+                            <td><strong>₹{{ "%.2f"|format(receipt.total_amount) }}</strong></td>
                         </tr>
                     </tbody>
                 </table>
-            </div>
 
-            <input type="hidden" id="selected_items" name="selected_items" value="">
-            <button type="submit" class="btn btn-primary mt-3">Record Sale</button>
-        </form>
+                <!-- Receipt Footer -->
+                <div class="text-center mt-4">
+                    <p>Thank you for your purchase!</p>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <!-- Print Receipt Form -->
+            <form action="{{ url_for('print_receipt', receipt_id=receipt.id) }}" method="POST" class="d-inline">
+                <button type="submit" class="btn btn-primary">Print Receipt</button>
+            </form>
+
+            <!-- Download Receipt Form -->
+            <form action="{{ url_for('download_receipt', receipt_id=receipt.id) }}" method="POST" class="d-inline">
+                <button type="submit" class="btn btn-success">Download Receipt</button>
+            </form>
+        </div>
     </div>
-    
-    <!-- Sales History Table -->
-    <div class="card mt-4">
+    {% endif %}
+
+    <!-- Recent Sales -->
+    <div class="card">
         <div class="card-header">
-            <h4>Sales History</h4>
+            <h3 class="card-title">Recent Sales</h3>
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-striped">
+                <table class="table">
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>Staff</th>
-                            <!-- Removed the Items column -->
-                            <th>Amount</th>
-                            <th>Payment Method</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Payment</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for sale in sales %}
+                        {% for sale in recent_sales %}
                         <tr>
                             <td>{{ sale.date }}</td>
-                            <td>{{ sale.staff_name }}</td>
-                            <!-- Removed the Items cell -->
+                            <td>{{ sale.items }}</td>
                             <td>₹{{ sale.total_amount }}</td>
                             <td>{{ sale.payment_method }}</td>
                             <td>
-                                <button class="btn btn-sm btn-primary view-receipt" 
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#receiptModal"
-                                        data-date="{{ sale.date }}"
-                                        data-staff="{{ sale.staff_name }}"
-                                        data-items="{{ sale.items }}"
-                                        data-amount="{{ sale.total_amount }}"
-                                        data-payment="{{ sale.payment_method }}"
-                                        data-items-details="{{ sale.items_details }}">
-                                    View Receipt
-                                </button>
+                                <a href="{{ url_for('view_receipt', sale_id=sale.id) }}" class="btn btn-sm btn-info">View Receipt</a>
                             </td>
                         </tr>
                         {% endfor %}
@@ -460,581 +195,11 @@
     </div>
 </div>
 
-<!-- Receipt Modal -->
-                <div class="modal fade" id="receiptModal" tabindex="-1" role="dialog" aria-labelledby="receiptModalLabel" aria-hidden="true">
-                    <div class="modal-dialog" role="document">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="receiptModalLabel">Sale Receipt</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="receipt-content">
-                                    <div class="text-center mb-3">
-                                        <h4>GYM Sales Receipt</h4>
-                                        <p class="mb-0">Date: <span id="receipt-date"></span></p>
-                                    </div>
-                                    <hr>
-                                    <div class="row mb-2">
-                                        <div class="col-6 font-weight-bold">Staff:</div>
-                                        <div class="col-6" id="receipt-staff"></div>
-                                    </div>
-                                    <div class="row mb-2">
-                                        <div class="col-6 font-weight-bold">Payment Method:</div>
-                                        <div class="col-6" id="receipt-payment"></div>
-                                    </div>
-                                    <hr>
-                                    <h6 class="font-weight-bold">Items:</h6>
-                                    <div class="table-responsive mb-3">
-                                        <table class="table table-sm">
-                                            <thead>
-                                                <tr>
-                                                    <th>Item</th>
-                                                    <th>Price/Serving</th>
-                                                    <th>Quantity</th>
-                                                    <th class="text-end">Subtotal</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="receipt-items-table">
-                                                <!-- Items will be inserted here -->
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <hr>
-                                    <div class="row font-weight-bold">
-                                        <div class="col-6">Total Amount:</div>
-                                        <div class="col-6 text-right" id="receipt-amount"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                <button type="button" class="btn btn-primary" id="print-receipt">Print Receipt</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-<script>
-
-    document.addEventListener('DOMContentLoaded', function() {
-        const itemSelect = document.getElementById('item_select');
-        const itemQuantity = document.getElementById('item_quantity');
-        const addItemBtn = document.getElementById('add_item_btn');
-        const selectedItemsTable = document.getElementById('selected_items_table').querySelector('tbody');
-        const noItemsRow = document.getElementById('no_items_row');
-        const totalAmountInput = document.getElementById('total_amount');
-        const selectedItemsInput = document.getElementById('selected_items');
-        const saleForm = document.getElementById('saleForm');
-        
-        // Store selected items
-        const selectedItems = [];
-        
-        // Add item to the selected items list
-        addItemBtn.addEventListener('click', function() {
-            const selectedOption = itemSelect.options[itemSelect.selectedIndex];
-            if (!selectedOption.value) {
-                alert('Please select an item');
-                return;
-            }
-            
-            const itemId = selectedOption.value;
-            const itemName = selectedOption.dataset.name;
-            const itemPrice = parseFloat(selectedOption.dataset.price);
-            const maxQuantity = parseInt(selectedOption.dataset.max);
-            let quantity = parseInt(itemQuantity.value) || 1;
-            
-            // Validate quantity
-            if (quantity < 1) {
-                quantity = 1;
-                itemQuantity.value = 1;
-            }
-            if (quantity > maxQuantity) {
-                quantity = maxQuantity;
-                itemQuantity.value = maxQuantity;
-                alert(`Only ${maxQuantity} servings available for ${itemName}`);
-            }
-            
-            // Check if item already exists in the list
-            const existingItemIndex = selectedItems.findIndex(item => item.id === itemId);
-            if (existingItemIndex !== -1) {
-                // Update quantity if item already exists
-                const existingItem = selectedItems[existingItemIndex];
-                const newQuantity = existingItem.quantity + quantity;
-                
-                if (newQuantity > maxQuantity) {
-                    alert(`Cannot add more. You already have ${existingItem.quantity} of ${itemName} in your cart.`);
-                    return;
-                }
-                
-                existingItem.quantity = newQuantity;
-                existingItem.subtotal = newQuantity * itemPrice;
-                
-                // Update the table row
-                const rows = selectedItemsTable.querySelectorAll('tr[data-id]');
-                for (let row of rows) {
-                    if (row.dataset.id === itemId) {
-                        const quantityCell = row.querySelector('.item-quantity');
-                        const subtotalCell = row.querySelector('.item-subtotal');
-                        
-                        quantityCell.textContent = newQuantity;
-                        subtotalCell.textContent = `₹${existingItem.subtotal.toFixed(2)}`;
-                        break;
-                    }
-                }
-            } else {
-                // Add new item
-                const subtotal = quantity * itemPrice;
-                const newItem = {
-                    id: itemId,
-                    name: itemName,
-                    price: itemPrice,
-                    quantity: quantity,
-                    subtotal: subtotal,
-                    maxQuantity: maxQuantity
-                };
-                
-                selectedItems.push(newItem);
-                
-                // Hide "No items" row if this is the first item
-                if (selectedItems.length === 1) {
-                    noItemsRow.style.display = 'none';
-                }
-                
-                // Add new row to the table
-                const newRow = document.createElement('tr');
-                newRow.dataset.id = itemId;
-                newRow.innerHTML = `
-                    <td>${itemName}</td>
-                    <td>₹${itemPrice.toFixed(2)}</td>
-                    <td class="item-quantity">${quantity}</td>
-                    <td class="item-subtotal">₹${subtotal.toFixed(2)}</td>
-                    <td>
-                        <button type="button" class="btn btn-sm btn-danger remove-item" data-id="${itemId}">
-                            <i class="fas fa-trash"></i> Remove
-                        </button>
-                    </td>
-                `;
-                selectedItemsTable.appendChild(newRow);
-                
-                // Add event listener to the remove button
-                newRow.querySelector('.remove-item').addEventListener('click', function() {
-                    removeItem(this.dataset.id);
-                });
-            }
-            
-            // Reset selection
-            itemSelect.selectedIndex = 0;
-            itemQuantity.value = 1;
-            
-            // Update total
-            updateTotal();
-        });
-        
-        // Remove item from the selected items list
-        function removeItem(itemId) {
-            const index = selectedItems.findIndex(item => item.id === itemId);
-            if (index !== -1) {
-                selectedItems.splice(index, 1);
-                
-                // Remove row from table
-                const row = selectedItemsTable.querySelector(`tr[data-id="${itemId}"]`);
-                if (row) {
-                    row.remove();
-                }
-                
-                // Show "No items" row if no items left
-                if (selectedItems.length === 0) {
-                    noItemsRow.style.display = '';
-                }
-                
-                // Update total
-                updateTotal();
-            }
-        }
-        
-        // Update total amount
-        function updateTotal() {
-            let total = 0;
-            selectedItems.forEach(item => {
-                total += item.subtotal;
-            });
-            
-            totalAmountInput.value = total.toFixed(2);
-        }
-        
-        // Make selectedCustomProducts accessible globally within this scope
-        window.selectedCustomProducts = [];
-        
-        // Modify the form submission handler
-        const saleForm = document.getElementById('saleForm');
-        saleForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-        
-            if (selectedItems.length === 0 && window.selectedCustomProducts.length === 0) {
-                alert('Please select at least one item or custom product');
-                return;
-            }
-        
-            // Prepare data for submission
-            const regularItems = selectedItems.map(item => ({
-                id: item.id,
-                name: item.name,
-                quantity: item.quantity,
-                price: item.price,
-                subtotal: item.subtotal,
-                type: 'regular'
-            }));
-        
-            const customItems = window.selectedCustomProducts.map(item => ({
-                id: item.id,
-                name: item.name,
-                quantity: item.quantity,
-                price: item.price,
-                subtotal: item.subtotal,
-                type: 'custom'
-            }));
-        
-            const allItems = [...regularItems, ...customItems];
-            
-            const saleData = {
-                staff_username: document.querySelector('input[name="staff_username"]').value,
-                payment_method: document.getElementById('payment_method').value,
-                total_amount: document.getElementById('total_amount').value,
-                items: allItems
-            };
-        
-            // Send the sale data to the server
-            fetch('/add_sale', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrf_token]').value
-                },
-                body: JSON.stringify(saleData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Sale recorded successfully');
-                    window.location.reload();
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error recording sale');
-            });
-        });
-
-        // Validate quantity input when item is selected
-        itemSelect.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            if (selectedOption.value) {
-                const maxQuantity = parseInt(selectedOption.dataset.max);
-                itemQuantity.max = maxQuantity;
-                
-                if (parseInt(itemQuantity.value) > maxQuantity) {
-                    itemQuantity.value = maxQuantity;
-                }
-            }
-        });
-        
-        // Receipt modal functionality
-        const receiptModal = document.getElementById('receiptModal');
-        const viewReceiptButtons = document.querySelectorAll('.view-receipt');
-        
-        viewReceiptButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                const date = this.getAttribute('data-date');
-                const staff = this.getAttribute('data-staff');
-                const items = this.getAttribute('data-items');
-                const amount = this.getAttribute('data-amount');
-                const payment = this.getAttribute('data-payment');
-                const itemsDetails = this.getAttribute('data-items-details');
-                
-                document.getElementById('receipt-date').textContent = date;
-                document.getElementById('receipt-staff').textContent = staff;
-                document.getElementById('receipt-payment').textContent = payment;
-                document.getElementById('receipt-amount').textContent = '₹' + amount;
-                
-                // Parse items and create a table
-                const itemsTableBody = document.getElementById('receipt-items-table');
-                itemsTableBody.innerHTML = '';
-                
-                console.log("Raw items data:", items);
-                console.log("Raw items details:", itemsDetails);
-                
-                // Get inventory data for price lookup
-                const inventoryOptions = document.querySelectorAll('#item_select option');
-                const inventoryMap = {};
-                
-                // Create a map of inventory items for quick lookup
-                inventoryOptions.forEach(option => {
-                    if (option.value) {
-                        inventoryMap[option.value] = {
-                            name: option.dataset.name,
-                            price: parseFloat(option.dataset.price)
-                        };
-                    }
-                });
-                
-                // First try to parse itemsDetails if available
-                if (itemsDetails && itemsDetails.trim() !== '') {
-                    try {
-                        const parsedDetails = JSON.parse(itemsDetails);
-                        console.log("Successfully parsed items details:", parsedDetails);
-                        
-                        if (Array.isArray(parsedDetails)) {
-                            parsedDetails.forEach((item, index) => {
-                                const row = document.createElement('tr');
-                                row.innerHTML = `
-                                    <td>${item.name}</td>
-                                    <td>₹${parseFloat(item.price).toFixed(2)}</td>
-                                    <td class="text-center">${item.quantity}</td>
-                                    <td class="text-end">₹${(parseFloat(item.price) * parseInt(item.quantity)).toFixed(2)}</td>
-                                `;
-                                itemsTableBody.appendChild(row);
-                            });
-                            
-                            // Add total row
-                            const totalRow = document.createElement('tr');
-                            totalRow.className = 'table-active';
-                            totalRow.innerHTML = `
-                                <td colspan="3" class="text-end fw-bold">Total:</td>
-                                <td class="text-end fw-bold">₹${amount}</td>
-                            `;
-                            itemsTableBody.appendChild(totalRow);
-                            return; // Exit if we successfully processed itemsDetails
-                        }
-                    } catch (e) {
-                        console.log("Error parsing itemsDetails JSON:", e);
-                    }
-                }
-                
-                // If we get here, try to parse the items data
-                try {
-                    // Try to parse as JSON first
-                    const parsedItems = JSON.parse(items);
-                    console.log("Successfully parsed items as JSON:", parsedItems);
-                    
-                    if (Array.isArray(parsedItems)) {
-                        parsedItems.forEach((item, index) => {
-                            // Find the item in inventory
-                            const inventoryItem = inventoryMap[item.id];
-                            
-                            if (inventoryItem) {
-                                const itemTotal = inventoryItem.price * item.quantity;
-                                
-                                // Create table row
-                                const row = document.createElement('tr');
-                                row.innerHTML = `
-                                    <td>${inventoryItem.name}</td>
-                                    <td>₹${inventoryItem.price.toFixed(2)}</td>
-                                    <td class="text-center">${item.quantity}</td>
-                                    <td class="text-end">₹${itemTotal.toFixed(2)}</td>
-                                `;
-                                itemsTableBody.appendChild(row);
-                            }
-                        });
-                    }
-                } catch (e) {
-                    console.log("Error parsing JSON, trying string format:", e);
-                    
-                    // If JSON parsing fails, try the string format
-                    if (items && items.trim() !== '') {
-                        // Split by comma to get individual items
-                        const itemsList = items.split(',').map(item => item.trim());
-                        console.log("Items list from string:", itemsList);
-                        
-                        // Process each item
-                        itemsList.forEach((itemStr, index) => {
-                            console.log("Processing item:", itemStr);
-                            
-                            // Extract item name and quantity using regex
-                            const match = itemStr.match(/(.*?)\s*\((\d+)\)/);
-                            
-                            if (match) {
-                                const itemName = match[1].trim();
-                                const quantity = parseInt(match[2]);
-                                
-                                console.log("Matched item:", itemName, "Quantity:", quantity);
-                                
-                                // Find the item price from inventory
-                                let itemPrice = 0;
-                                let foundItem = null;
-                                
-                                // Search through all inventory options
-                                for (const id in inventoryMap) {
-                                    if (inventoryMap[id].name === itemName) {
-                                        itemPrice = inventoryMap[id].price;
-                                        foundItem = inventoryMap[id];
-                                        break;
-                                    }
-                                }
-                                
-                                console.log("Found item:", foundItem);
-                                
-                                // Calculate total for this item
-                                const itemTotal = itemPrice * quantity;
-                                
-                                // Create table row
-                                const row = document.createElement('tr');
-                                row.innerHTML = `
-                                    <td>${itemName}</td>
-                                    <td>₹${itemPrice.toFixed(2)}</td>
-                                    <td class="text-center">${quantity}</td>
-                                    <td class="text-end">₹${itemTotal.toFixed(2)}</td>
-                                `;
-                                itemsTableBody.appendChild(row);
-                            } else {
-                                console.log("No match found for item:", itemStr);
-                                
-                                // If no quantity pattern found, just display the item string
-                                const row = document.createElement('tr');
-                                row.innerHTML = `
-                                    <td>${itemStr}</td>
-                                    <td>-</td>
-                                    <td class="text-center">1</td>
-                                    <td class="text-end">-</td>
-                                `;
-                                itemsTableBody.appendChild(row);
-                            }
-                        });
-                    }
-                }
-                
-                // Add total row
-                const totalRow = document.createElement('tr');
-                totalRow.className = 'table-active';
-                totalRow.innerHTML = `
-                    <td colspan="3" class="text-end fw-bold">Total:</td>
-                    <td class="text-end fw-bold">₹${amount}</td>
-                `;
-                itemsTableBody.appendChild(totalRow);
-            });
-        });
-        
-        // Print receipt functionality
-        document.getElementById('print-receipt').addEventListener('click', function() {
-            const receiptContent = document.querySelector('.receipt-content').innerHTML;
-            const printWindow = window.open('', '_blank');
-            
-            printWindow.document.write(`
-                <html>
-                <head>
-                    <title>GYM Sales Receipt</title>
-                    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-                    <style>
-                        body { padding: 20px; }
-                        @media print {
-                            .no-print { display: none; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        ${receiptContent}
-                        <div class="text-center mt-4">
-                            <p>Thank you for your purchase!</p>
-                        </div>
-                    </div>
-                    <div class="no-print text-center mt-4">
-                        <button onclick="window.print()" class="btn btn-primary">Print</button>
-                        <button onclick="window.close()" class="btn btn-secondary ml-2">Close</button>
-                    </div>
-                </body>
-                </html>
-            `);
-            
-            printWindow.document.close();
-        });
-    });
-</script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const customProductSelect = document.getElementById('customProductSelect');
-    const customQuantityInput = document.getElementById('custom_quantity');
-    const addCustomBtn = document.getElementById('add_custom_btn');
-    const selectedCustomTable = document.getElementById('selected_custom_table').querySelector('tbody');
-    const noCustomRow = document.getElementById('no_custom_row');
-    
-    const selectedCustomProducts = [];
-    
-    addCustomBtn.addEventListener('click', function() {
-        const selectedOption = customProductSelect.options[customProductSelect.selectedIndex];
-        if (!selectedOption.value) {
-            alert('Please select a custom product');
-            return;
-        }
-        
-        const productId = selectedOption.value;
-        const productName = selectedOption.dataset.name;
-        const productPrice = parseFloat(selectedOption.dataset.price);
-        const quantity = parseInt(customQuantityInput.value) || 1;
-        
-        // Calculate subtotal
-        const subtotal = productPrice * quantity;
-        
-        // Add to selected products array
-        selectedCustomProducts.push({
-            id: productId,
-            name: productName,
-            price: productPrice,
-            quantity: quantity,
-            subtotal: subtotal
-        });
-        
-        // Hide "No products" row
-        noCustomRow.style.display = 'none';
-        
-        // Add row to table
-        const newRow = document.createElement('tr');
-        newRow.dataset.id = productId;
-        newRow.innerHTML = `
-            <td>${productName}</td>
-            <td>₹${productPrice.toFixed(2)}</td>
-            <td>${quantity}</td>
-            <td>₹${subtotal.toFixed(2)}</td>
-            <td>
-                <button type="button" class="btn btn-sm btn-danger remove-custom" data-id="${productId}">
-                    <i class="fas fa-trash"></i> Remove
-                </button>
-            </td>
-        `;
-        selectedCustomTable.appendChild(newRow);
-        
-        // Add remove functionality
-        newRow.querySelector('.remove-custom').addEventListener('click', function() {
-            const index = selectedCustomProducts.findIndex(p => p.id === this.dataset.id);
-            if (index !== -1) {
-                selectedCustomProducts.splice(index, 1);
-                newRow.remove();
-                if (selectedCustomProducts.length === 0) {
-                    noCustomRow.style.display = '';
-                }
-                updateTotalAmount(); // Update the total amount
-            }
-        });
-        
-        // Reset selection
-        customProductSelect.selectedIndex = 0;
-        customQuantityInput.value = 1;
-        
-        // Update total amount
-        updateTotalAmount();
-    });
-    
-    function updateTotalAmount() {
-        const regularItemsTotal = Array.from(document.querySelectorAll('#selected_items_table .item-subtotal'))
-            .reduce((sum, el) => sum + parseFloat(el.textContent.replace('₹', '') || 0), 0);
-            
-        const customProductsTotal = selectedCustomProducts.reduce((sum, item) => sum + item.subtotal, 0);
-        
-        const totalAmount = regularItemsTotal + customProductsTotal;
-        document.getElementById('total_amount').value = totalAmount.toFixed(2);
+<style>
+    @media print {
+        .btn, form { display: none; }
+        .container { width: 100%; max-width: none; }
+        .receipt-content { padding: 20px; }
     }
-});
-</script>
+</style>
 {% endblock %}
