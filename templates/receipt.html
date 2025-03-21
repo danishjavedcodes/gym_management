@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="card">
+        <div class="card-header">
+            <h4>Sale Receipt</h4>
+        </div>
+        <div class="card-body">
+            <div class="text-center mb-3">
+                <h4>GYM Sales Receipt</h4>
+                <p class="mb-0">Date: {{ sale.date }}</p>
+            </div>
+            <hr>
+            <div class="row mb-2">
+                <div class="col-6 font-weight-bold">Staff:</div>
+                <div class="col-6">{{ sale.staff_name }}</div>
+            </div>
+            <div class="row mb-2">
+                <div class="col-6 font-weight-bold">Payment Method:</div>
+                <div class="col-6">{{ sale.payment_method }}</div>
+            </div>
+            <hr>
+            <h6 class="font-weight-bold">Items:</h6>
+            <div class="table-responsive mb-3">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Price/Serving</th>
+                            <th>Quantity</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in sale.items %}
+                        <tr>
+                            <td>{{ item.name }}</td>
+                            <td>₹{{ item.price }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td class="text-end">₹{{ item.subtotal }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="table-active">
+                            <td colspan="3" class="text-end fw-bold">Total:</td>
+                            <td class="text-end fw-bold">₹{{ sale.total_amount }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-center mt-4">
+                <a href="{{ url_for('print_receipt', sale_id=sale.id) }}" 
+                   class="btn btn-primary" target="_blank">Print Receipt</a>
+                <a href="{{ url_for('sales') }}" class="btn btn-secondary">Back to Sales</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

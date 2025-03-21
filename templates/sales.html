@@ -235,26 +235,29 @@
                 <!-- Move this script to the main script section -->
                 <script>
                 document.addEventListener('DOMContentLoaded', function() {
-                    // Add custom product save functionality
+                    // Update the save custom product event listener
                     document.getElementById('saveCustomProduct').addEventListener('click', function() {
                         const productName = document.getElementById('customProductName').value;
                         const staffName = document.querySelector('input[name="staff_username"]').value;
-                        const finalPrice = document.getElementById('finalPrice').value;
+                        const finalPrice = parseFloat(document.getElementById('finalPrice').value);
                         
-                        if (!productName || selectedIngredients.length === 0) {
-                            alert('Please enter product name and add at least one ingredient');
+                        if (!productName || selectedIngredients.length === 0 || !finalPrice) {
+                            alert('Please enter product name, add ingredients, and set a final price');
                             return;
                         }
                         
                         const data = {
                             product_name: productName,
                             staff_name: staffName,
-                            ingredients: selectedIngredients,
-                            final_price: finalPrice,
-                            payment_method: 'Custom Product'  // Add payment method
+                            ingredients: selectedIngredients.map(item => ({
+                                id: item.id,
+                                name: item.name,
+                                quantity: item.quantity,
+                                price: item.price
+                            })),
+                            final_price: finalPrice
                         };
                         
-                        // Send data to server
                         fetch('/add_custom_product', {
                             method: 'POST',
                             headers: {
@@ -265,13 +268,8 @@
                         .then(response => response.json())
                         .then(data => {
                             if (data.success) {
-                                alert('Custom product added successfully');
-                                // Close modal and reset form
-                                const modal = bootstrap.Modal.getInstance(document.getElementById('customProductModal'));
-                                modal.hide();
-                                document.getElementById('customProductForm').reset();
-                                // Reload page to update sales history
-                                location.reload();
+                                alert('Custom product saved successfully');
+                                window.location.href = '/sales';  // Redirect to sales page
                             } else {
                                 alert('Error: ' + data.message);
                             }
@@ -313,28 +311,18 @@
                 </div>
             </div>
             
+            <!-- Regular Items Section -->
             <div class="row mb-3">
                 <div class="col-md-8">
-                    <label for="item_select">Select Item</label>
+                    <label for="item_select">Select Regular Item</label>
                     <select class="form-control" id="item_select">
                         <option value="">-- Select an item to add --</option>
                         {% for item in inventory %}
-                            {% if item.is_custom == 'Yes' %}
-                                <option value="{{ item.id }}" 
-                                        data-name="{{ item.stock_type }}"
-                                        data-price="{{ item.cost_per_serving + item.profit_per_serving }}"
-                                        data-max="999"
-                                        data-custom="true"
-                                        {% if item.ingredients_available is defined and not item.ingredients_available %}disabled{% endif %}>
-                                    {{ item.stock_type }} - ₹{{ item.cost_per_serving + item.profit_per_serving }}/serving
-                                    {% if item.ingredients_available is defined and not item.ingredients_available %}(Ingredients unavailable){% endif %}
-                                </option>
-                            {% else %}
+                            {% if not item.is_custom %}
                                 <option value="{{ item.id }}" 
                                         data-name="{{ item.stock_type }}"
                                         data-price="{{ item.cost_per_serving + item.profit_per_serving }}"
                                         data-max="{{ item.servings }}"
-                                        data-custom="false"
                                         {% if item.servings|int <= 0 %}disabled{% endif %}>
                                     {{ item.stock_type }} - ₹{{ item.cost_per_serving + item.profit_per_serving }}/serving ({{ item.servings }} available)
                                 </option>
@@ -351,8 +339,10 @@
                     <button type="button" class="btn btn-success form-control" id="add_item_btn">Add Item</button>
                 </div>
             </div>
-            
-            <div class="table-responsive mb-3">
+
+            <!-- Regular Items Table -->
+            <div class="table-responsive mb-4">
+                <h5>Regular Items</h5>
                 <table class="table table-striped" id="selected_items_table">
                     <thead>
                         <tr>
@@ -370,7 +360,53 @@
                     </tbody>
                 </table>
             </div>
-            
+
+            <!-- Custom Products Section -->
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <label for="customProductSelect">Select Custom Product</label>
+                    <select id="customProductSelect" class="form-control">
+                        <option value="">-- Select a custom product --</option>
+                        {% for product in custom_products %}
+                        <option value="{{ product.product_id }}" 
+                                data-price="{{ product.final_price }}"
+                                data-name="{{ product.product_name }}">
+                            {{ product.product_name }} - Rs.{{ product.final_price }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="custom_quantity">Quantity</label>
+                    <input type="number" class="form-control" id="custom_quantity" min="1" value="1">
+                </div>
+                <div class="col-md-2">
+                    <label>&nbsp;</label>
+                    <button type="button" class="btn btn-success form-control" id="add_custom_btn">Add Product</button>
+                </div>
+            </div>
+
+            <!-- Custom Products Table -->
+            <div class="table-responsive mb-4">
+                <h5>Custom Products</h5>
+                <table class="table table-striped" id="selected_custom_table">
+                    <thead>
+                        <tr>
+                            <th>Custom Product</th>
+                            <th>Price/Serving</th>
+                            <th>Quantity</th>
+                            <th>Subtotal</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr id="no_custom_row">
+                            <td colspan="5" class="text-center">No custom products selected</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
             <input type="hidden" id="selected_items" name="selected_items" value="">
             <button type="submit" class="btn btn-primary mt-3">Record Sale</button>
         </form>
@@ -480,6 +516,7 @@
                 </div>
 
 <script>
+
     document.addEventListener('DOMContentLoaded', function() {
         const itemSelect = document.getElementById('item_select');
         const itemQuantity = document.getElementById('item_quantity');
@@ -626,23 +663,71 @@
             totalAmountInput.value = total.toFixed(2);
         }
         
-        // Prepare selected items data before form submission
+        // Make selectedCustomProducts accessible globally within this scope
+        window.selectedCustomProducts = [];
+        
+        // Modify the form submission handler
+        const saleForm = document.getElementById('saleForm');
         saleForm.addEventListener('submit', function(e) {
-            if (selectedItems.length === 0) {
-                e.preventDefault();
-                alert('Please select at least one item');
+            e.preventDefault();
+        
+            if (selectedItems.length === 0 && window.selectedCustomProducts.length === 0) {
+                alert('Please select at least one item or custom product');
                 return;
             }
-            
-            // Prepare data for submission - only include necessary fields
-            const itemsForSubmission = selectedItems.map(item => ({
-                id: item.id,
-                quantity: item.quantity
-            }));
-            
-            selectedItemsInput.value = JSON.stringify(itemsForSubmission);
-        });
         
+            // Prepare data for submission
+            const regularItems = selectedItems.map(item => ({
+                id: item.id,
+                name: item.name,
+                quantity: item.quantity,
+                price: item.price,
+                subtotal: item.subtotal,
+                type: 'regular'
+            }));
+        
+            const customItems = window.selectedCustomProducts.map(item => ({
+                id: item.id,
+                name: item.name,
+                quantity: item.quantity,
+                price: item.price,
+                subtotal: item.subtotal,
+                type: 'custom'
+            }));
+        
+            const allItems = [...regularItems, ...customItems];
+            
+            const saleData = {
+                staff_username: document.querySelector('input[name="staff_username"]').value,
+                payment_method: document.getElementById('payment_method').value,
+                total_amount: document.getElementById('total_amount').value,
+                items: allItems
+            };
+        
+            // Send the sale data to the server
+            fetch('/add_sale', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+                },
+                body: JSON.stringify(saleData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Sale recorded successfully');
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error recording sale');
+            });
+        });
+
         // Validate quantity input when item is selected
         itemSelect.addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
@@ -866,5 +951,90 @@
             printWindow.document.close();
         });
     });
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const customProductSelect = document.getElementById('customProductSelect');
+    const customQuantityInput = document.getElementById('custom_quantity');
+    const addCustomBtn = document.getElementById('add_custom_btn');
+    const selectedCustomTable = document.getElementById('selected_custom_table').querySelector('tbody');
+    const noCustomRow = document.getElementById('no_custom_row');
+    
+    const selectedCustomProducts = [];
+    
+    addCustomBtn.addEventListener('click', function() {
+        const selectedOption = customProductSelect.options[customProductSelect.selectedIndex];
+        if (!selectedOption.value) {
+            alert('Please select a custom product');
+            return;
+        }
+        
+        const productId = selectedOption.value;
+        const productName = selectedOption.dataset.name;
+        const productPrice = parseFloat(selectedOption.dataset.price);
+        const quantity = parseInt(customQuantityInput.value) || 1;
+        
+        // Calculate subtotal
+        const subtotal = productPrice * quantity;
+        
+        // Add to selected products array
+        selectedCustomProducts.push({
+            id: productId,
+            name: productName,
+            price: productPrice,
+            quantity: quantity,
+            subtotal: subtotal
+        });
+        
+        // Hide "No products" row
+        noCustomRow.style.display = 'none';
+        
+        // Add row to table
+        const newRow = document.createElement('tr');
+        newRow.dataset.id = productId;
+        newRow.innerHTML = `
+            <td>${productName}</td>
+            <td>₹${productPrice.toFixed(2)}</td>
+            <td>${quantity}</td>
+            <td>₹${subtotal.toFixed(2)}</td>
+            <td>
+                <button type="button" class="btn btn-sm btn-danger remove-custom" data-id="${productId}">
+                    <i class="fas fa-trash"></i> Remove
+                </button>
+            </td>
+        `;
+        selectedCustomTable.appendChild(newRow);
+        
+        // Add remove functionality
+        newRow.querySelector('.remove-custom').addEventListener('click', function() {
+            const index = selectedCustomProducts.findIndex(p => p.id === this.dataset.id);
+            if (index !== -1) {
+                selectedCustomProducts.splice(index, 1);
+                newRow.remove();
+                if (selectedCustomProducts.length === 0) {
+                    noCustomRow.style.display = '';
+                }
+                updateTotalAmount(); // Update the total amount
+            }
+        });
+        
+        // Reset selection
+        customProductSelect.selectedIndex = 0;
+        customQuantityInput.value = 1;
+        
+        // Update total amount
+        updateTotalAmount();
+    });
+    
+    function updateTotalAmount() {
+        const regularItemsTotal = Array.from(document.querySelectorAll('#selected_items_table .item-subtotal'))
+            .reduce((sum, el) => sum + parseFloat(el.textContent.replace('₹', '') || 0), 0);
+            
+        const customProductsTotal = selectedCustomProducts.reduce((sum, item) => sum + item.subtotal, 0);
+        
+        const totalAmount = regularItemsTotal + customProductsTotal;
+        document.getElementById('total_amount').value = totalAmount.toFixed(2);
+    }
+});
 </script>
 {% endblock %}

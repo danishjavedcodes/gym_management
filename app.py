@@ -1,3 +1,4 @@
+
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 import pandas as pd
 from datetime import datetime, timedelta
@@ -68,6 +69,14 @@ def init_excel_files():
         'attendance.xlsx': {
             'date': [], 'member_id': [], 'member_name': [], 
             'check_in': [], 'check_out': []  # Added check_out
+        },
+        'custom_products.xlsx': {
+            'product_id': [],
+            'product_name': [],
+            'ingredients': [],
+            'price': [],
+            'created_by': [],
+            'creation_date': []
         },
         'inventory.xlsx': {
             'id': [], 'stock_type': [], 'servings': [], 'cost_per_serving': [],
@@ -174,7 +183,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# Remove this duplicate route and keep only one instance
+# This duplicate route and keep only one instance
 @app.route('/admin/dashboard')
 def admin_dashboard():
     if 'user_type' not in session or session['user_type'] != 'admin':
@@ -771,78 +780,67 @@ def custom_product_page():
 
 @app.route('/add_custom_product', methods=['POST'])
 def add_custom_product():
-    if 'user_type' not in session:
-        return redirect(url_for('login'))
-    
     try:
-        # Get form data
-        product_name = request.form.get('product_name')
-        ingredients_json = request.form.get('ingredients_json')
+        # Get form data with correct field names
+        product_name = str(request.form.get('product_name', '')).strip()
+        ingredients_json = request.form.get('ingredients_json', '[]')
+        final_price = int(float(request.form.get('final_price', '0')))
         
-        # Check if required fields are present
-        if not product_name or not ingredients_json:
-            flash('Product name and ingredients are required')
+        if not product_name:
+            flash('Product name is required')
             return redirect(url_for('custom_product_page'))
-        
-        # Safely get and convert final_price with a default value
-        final_price_str = request.form.get('final_price')
-        if not final_price_str:
-            flash('Final price is required')
-            return redirect(url_for('custom_product_page'))
-            
-        try:
-            final_price = float(final_price_str)
-        except ValueError:
-            flash('Invalid price format')
-            return redirect(url_for('custom_product_page'))
-        
-        # Parse ingredients
+
+        # Parse ingredients JSON
         try:
             ingredients = json.loads(ingredients_json)
         except json.JSONDecodeError:
-            flash('Invalid ingredients data')
-            return redirect(url_for('custom_product_page'))
-        
-        # Load inventory data
-        inventory_df = pd.read_excel('data/inventory.xlsx')
-        
-        # Calculate total cost
-        total_cost = 0
-        for ing in ingredients:
-            ing_price = float(ing.get('price', 0))
-            ing_quantity = float(ing.get('quantity', 0))
-            total_cost += ing_price * ing_quantity
-            
+            ingredients = []
+
+        # Calculate total cost from ingredients
+        total_cost = sum(float(item['price']) * float(item['quantity']) for item in ingredients)
         profit = final_price - total_cost
+
+        # Create or load custom_products.xlsx
+        file_path = 'data/custom_products.xlsx'
+        os.makedirs('data', exist_ok=True)
         
-        # Generate new ID
-        new_id = int(inventory_df['id'].max() + 1) if not inventory_df.empty else 1001
-        
-        # Create new inventory item
+        try:
+            custom_products_df = pd.read_excel(file_path)
+        except FileNotFoundError:
+            custom_products_df = pd.DataFrame(columns=[
+                'product_id', 'product_name', 'ingredients', 
+                'total_cost', 'final_price', 'profit',
+                'created_by', 'creation_date'
+            ])
+
+        # Generate unique product ID
+        next_id = 1001 if custom_products_df.empty else int(custom_products_df['product_id'].max()) + 1
+
+        # Create new product entry
         new_product = {
-            'id': new_id,
-            'stock_type': product_name,
-            'servings': 1,
-            'cost_per_serving': total_cost,
-            'profit_per_serving': profit,
-            'other_charges': 0,
-            'date_added': datetime.now().strftime('%Y-%m-%d'),
-            'is_custom': 'Yes',
-            'recipe': ingredients_json,
-            'created_by': session.get('username', 'Unknown')
+            'product_id': next_id,
+            'product_name': product_name,
+            'ingredients': ingredients_json,  # Store the original JSON string
+            'total_cost': total_cost,
+            'final_price': final_price,
+            'profit': profit,
+            'created_by': session.get('username', 'admin'),
+            'creation_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
-        
-        # Add new product to inventory
-        inventory_df = pd.concat([inventory_df, pd.DataFrame([new_product])], ignore_index=True)
-        inventory_df.to_excel('data/inventory.xlsx', index=False)
+
+        # Add to DataFrame and save
+        custom_products_df = pd.concat([custom_products_df, pd.DataFrame([new_product])], ignore_index=True)
+        custom_products_df.to_excel(file_path, index=False)
         
         flash('Custom product added successfully')
-        return redirect(url_for('sales'))
-        
+        return redirect(url_for('custom_product_page'))
+
     except Exception as e:
-        app.logger.error(f"Error adding custom product: {str(e)}")
+        app.logger.error(f"Error in add_custom_product: {str(e)}")
         flash(f'Error adding custom product: {str(e)}')
-        return redirect(url_for('sales'))
+        return redirect(url_for('custom_product_page'))
+
+
 
 
 
@@ -926,6 +924,7 @@ def mark_payment_as_paid():
         flash(f'Error recording payment: {str(e)}')
     
     return redirect(url_for('payments'))
+
 
 
 # Receptionist management routes
@@ -1268,6 +1267,8 @@ def delete_inventory(item_id):
     
     return redirect(url_for('inventory'))
 
+
+
 # Sales management routes
 @app.route('/sales')
 def sales():
@@ -1276,38 +1277,33 @@ def sales():
     
     try:
         sales_df = pd.read_excel('data/sales.xlsx')
-        # Sort sales by date in descending order
-        sales_df = sales_df.sort_values(by='date', ascending=False)
         inventory_df = pd.read_excel('data/inventory.xlsx')
         
-        # Process inventory items to check custom product ingredient availability
-        inventory_items = []
-        for _, item in inventory_df.iterrows():
-            item_dict = item.to_dict()
+        # Add custom products to inventory items
+        try:
+            custom_products_df = pd.read_excel('data/custom_products.xlsx')
+            custom_items = []
+            for _, item in custom_products_df.iterrows():
+                custom_items.append({
+                    'id': f"CP{item['product_id']}",
+                    'stock_type': item['product_name'],
+                    'servings': 999,
+                    'cost_per_serving': 0,  # Not used for custom products
+                    'profit_per_serving': 0,  # Not used for custom products
+                    'price': item['final_price'],  # Add price directly
+                    'is_custom': True,
+                    'total_cost': item['total_cost'],
+                    'final_price': item['final_price']
+                })
             
-            # For custom products, check ingredient availability
-            if item_dict.get('is_custom') == 'Yes' and item_dict.get('recipe'):
-                try:
-                    recipe = json.loads(item_dict['recipe'])
-                    all_ingredients_available = True
-                    
-                    for ingredient in recipe:
-                        ing_id = ingredient['id']
-                        ing_quantity = float(ingredient['quantity'])
-                        
-                        # Find ingredient in inventory
-                        ing_rows = inventory_df[inventory_df['id'].astype(str) == str(ing_id)]
-                        if ing_rows.empty or float(ing_rows.iloc[0]['servings']) < ing_quantity:
-                            all_ingredients_available = False
-                            break
-                    
-                    # Set availability flag for template
-                    item_dict['ingredients_available'] = all_ingredients_available
-                except Exception as e:
-                    app.logger.error(f"Error checking custom product ingredients: {e}")
-                    item_dict['ingredients_available'] = False
+            # Convert inventory items to list
+            inventory_items = inventory_df.to_dict('records')
+            # Add custom products separately
+            custom_products = custom_products_df.to_dict('records')
             
-            inventory_items.append(item_dict)
+        except FileNotFoundError:
+            inventory_items = inventory_df.to_dict('records')
+            custom_products = []
         
         # Get current user info
         current_user = {
@@ -1315,7 +1311,6 @@ def sales():
             'name': 'Admin' if session['user_type'] == 'admin' else None
         }
         
-        # If not admin, get receptionist name
         if session['user_type'] != 'admin':
             staff_df = pd.read_excel('data/receptionists.xlsx')
             staff = staff_df[staff_df['username'] == session['username']].iloc[0]
@@ -1324,7 +1319,9 @@ def sales():
         return render_template('sales.html',
                              sales=sales_df.to_dict('records'),
                              current_user=current_user,
-                             inventory=inventory_items)
+                             inventory=inventory_items,
+                             custom_products=custom_products)  # Pass custom products separately
+                             
     except Exception as e:
         app.logger.error(f"Error loading sales data: {e}")
         flash('Error loading sales data')
