@@ -31,15 +31,15 @@
                         <input type="number" class="form-control form-control-lg" id="servings" name="servings" required>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">Cost/Serving (₹)</label>
+                        <label class="form-label">Cost/Serving (Rs. )</label>
                         <input type="number" step="0.01" class="form-control form-control-lg" id="cost_per_serving" name="cost_per_serving" required>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">Profit/Serving (₹)</label>
+                        <label class="form-label">Profit/Serving (Rs. )</label>
                         <input type="number" step="0.01" class="form-control form-control-lg" id="profit_per_serving" name="profit_per_serving" required>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">Other Charges (₹)</label>
+                        <label class="form-label">Other Charges (Rs. )</label>
                         <input type="number" step="0.01" class="form-control form-control-lg" id="other_charges" name="other_charges" required>
                     </div>
                 </div>
@@ -65,9 +65,9 @@
                             <th>ID</th>
                             <th>Stock Type</th>
                             <th>Servings</th>
-                            <th>Cost/Serving (₹)</th>
-                            <th>Profit/Serving (₹)</th>
-                            <th>Other Charges (₹)</th>
+                            <th>Cost/Serving (Rs. )</th>
+                            <th>Profit/Serving (Rs. )</th>
+                            <th>Other Charges (Rs. )</th>
                             <th>Date Added</th>
                             <th>Actions</th>
                         </tr>
@@ -78,9 +78,9 @@
                             <td>{{ item.id }}</td>
                             <td>{{ item.stock_type }}</td>
                             <td>{{ item.servings }}</td>
-                            <td>₹{{ item.cost_per_serving }}</td>
-                            <td>₹{{ item.profit_per_serving }}</td>
-                            <td>₹{{ item.other_charges }}</td>
+                            <td>Rs. {{ item.cost_per_serving }}</td>
+                            <td>Rs. {{ item.profit_per_serving }}</td>
+                            <td>Rs. {{ item.other_charges }}</td>
                             <td>{{ item.date_added }}</td>
                             <td>
                                 <div class="btn-group">
@@ -120,7 +120,7 @@
                             <th class="px-3">ID</th>
                             <th class="px-3">Product Name</th>
                             <th class="px-4">Ingredients</th>
-                            <th class="px-3">Final Price (₹)</th>
+                            <th class="px-3">Final Price (Rs. )</th>
                             <th class="px-3">Created By</th>
                             <th class="px-3">Creation Date</th>
                         </tr>
@@ -139,7 +139,7 @@
                                             <div>
                                                 <span class="badge bg-light text-dark me-2">{{ ingredient.name }}</span>
                                                 <span class="badge bg-info text-dark me-2">Qty: {{ ingredient.quantity }}</span>
-                                                <span class="badge bg-secondary">₹{{ ingredient.price }}</span>
+                                                <span class="badge bg-secondary">Rs. {{ ingredient.price }}</span>
                                             </div>
                                         </li>
                                     {% endfor %}
@@ -148,7 +148,7 @@
                                     {% endif %}
                                 </ul>
                             </td>
-                            <td class="px-3">₹{{ product.final_price }}</td>
+                            <td class="px-3">Rs. {{ product.final_price }}</td>
                             <td class="px-3">{{ product.created_by }}</td>
                             <td class="px-3">{{ product.creation_date }}</td>
                         </tr>

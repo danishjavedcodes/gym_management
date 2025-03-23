@@ -52,13 +52,13 @@
                                 {% endif %}
                             </td>
                             <td>{{ item.quantity }}</td>
-                            <td>₹{{ "%.2f"|format(item.price) }}</td>
-                            <td>₹{{ "%.2f"|format(item.total) }}</td>
+                            <td>Rs. {{ "%.2f"|format(item.price) }}</td>
+                            <td>Rs. {{ "%.2f"|format(item.total) }}</td>
                         </tr>
                         {% endfor %}
                         <tr class="table-info">
                             <td colspan="3" class="text-end"><strong>Grand Total:</strong></td>
-                            <td><strong>₹{{ "%.2f"|format(receipt.total_amount) }}</strong></td>
+                            <td><strong>Rs. {{ "%.2f"|format(receipt.total_amount) }}</strong></td>
                         </tr>
                     </tbody>
                 </table>

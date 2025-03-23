@@ -26,13 +26,13 @@
                 <select class="form-select" id="paymentMethod">
                     <option value="cash">Cash</option>
                     <option value="card">Card</option>
-                    <option value="upi">UPI</option>
+                    <option value="Online Paymrny">Online Paymrny</option>
                 </select>
             </div>
 
             <!-- Total Amount (Auto-calculated) -->
             <div class="mb-3">
-                <label class="form-label">Total Amount (₹)</label>
+                <label class="form-label">Total Amount (Rs. )</label>
                 <input type="text" class="form-control" id="totalAmount" readonly>
             </div>
 
@@ -46,7 +46,7 @@
                         <optgroup label="Regular Items">
                             {% for item in inventory %}
                             <option value="R_{{ item.id }}" data-price="{{ item.cost_per_serving + item.profit_per_serving }}">
-                                {{ item.stock_type }} (₹{{ item.cost_per_serving + item.profit_per_serving }})
+                                {{ item.stock_type }} (Rs. {{ item.cost_per_serving + item.profit_per_serving }})
                             </option>
                             {% endfor %}
                         </optgroup>
@@ -55,7 +55,7 @@
                         <optgroup label="Custom Products">
                             {% for product in custom_products %}
                             <option value="C_{{ product.product_id }}" data-price="{{ product.final_price }}">
-                                {{ product.product_name }} (₹{{ product.final_price }})
+                                {{ product.product_name }} (Rs. {{ product.final_price }})
                             </option>
                             {% endfor %}
                         </optgroup>
@@ -121,7 +121,7 @@
                     <tr>
                         <td>{{ sale.staff_name }}</td>
                         <td>{{ sale.date }}</td>
-                        <td>₹{{ "%.2f"|format(sale.total_amount) }}</td>
+                        <td>Rs. {{ "%.2f"|format(sale.total_amount) }}</td>
                         <td><span class="badge bg-info">{{ sale.payment_method|title }}</span></td>
                         <td>
                             <a href="{{ url_for('view_receipt', sale_id=sale.id) }}" 
@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateTotal() {
         totalAmount = Array.from(selectedItems.values()).reduce((sum, item) => sum + item.subtotal, 0);
-        document.getElementById('totalAmount').value = '₹' + totalAmount.toFixed(2);
+        document.getElementById('totalAmount').value = 'Rs. ' + totalAmount.toFixed(2);
     }
 
     function removeItem(itemId) {
@@ -175,9 +175,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${item.name}</td>
-                <td>₹${item.price.toFixed(2)}</td>
+                <td>Rs. ${item.price.toFixed(2)}</td>
                 <td>${item.quantity}</td>
-                <td>₹${item.subtotal.toFixed(2)}</td>
+                <td>Rs. ${item.subtotal.toFixed(2)}</td>
                 <td>
                     <button class="btn btn-danger btn-sm" onclick="removeItem('${itemId}')">
                         <i class="fas fa-trash"></i>
@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const subtotal = price * quantity;
 
         selectedItems.set(option.value, {
-            name: option.text.split(' (₹')[0],
+            name: option.text.split(' (Rs. ')[0],
             price: price,
             quantity: quantity,
             subtotal: subtotal

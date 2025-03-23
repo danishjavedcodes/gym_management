@@ -25,7 +25,7 @@
             <div class="card bg-light">
                 <div class="card-body text-center">
                     <h5 class="card-title">Membership Revenue</h5>
-                    <h3 class="card-text text-primary">₹{{ monthly_revenue }}</h3>
+                    <h3 class="card-text text-primary">Rs. {{ monthly_revenue }}</h3>
                 </div>
             </div>
         </div>
@@ -33,7 +33,7 @@
             <div class="card bg-light">
                 <div class="card-body text-center">
                     <h5 class="card-title">Sales Revenue</h5>
-                    <h3 class="card-text text-success">₹{{ monthly_sales_revenue }}</h3>
+                    <h3 class="card-text text-success">Rs. {{ monthly_sales_revenue }}</h3>
                 </div>
             </div>
         </div>
@@ -41,7 +41,7 @@
             <div class="card bg-light">
                 <div class="card-body text-center">
                     <h5 class="card-title">Total Revenue</h5>
-                    <h3 class="card-text text-dark">₹{{ total_revenue }}</h3>
+                    <h3 class="card-text text-dark">Rs. {{ total_revenue }}</h3>
                 </div>
             </div>
         </div>
@@ -120,7 +120,7 @@
                     <tr>
                         <td>{{ sale.date }}</td>
                         <td style="white-space: pre-line">{{ sale.items_display }}</td>
-                        <td>₹{{ sale.total_amount }}</td>
+                        <td>Rs. {{ sale.total_amount }}</td>
                         <td>{{ sale.payment_method }}</td>
                     </tr>
                     {% endfor %}

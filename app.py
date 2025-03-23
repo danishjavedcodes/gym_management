@@ -1466,7 +1466,7 @@ def add_sale():
         
         # Get form data
         payment_method = request.form.get('payment_method')
-        total_amount = float(request.form.get('total_amount').replace('₹', ''))
+        total_amount = float(request.form.get('total_amount').replace('Rs. ', ''))
         items_data = json.loads(request.form.get('items'))
         
         # Process each item and update inventory
