@@ -13,9 +13,11 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 import io
+import pytz
 
 
 app = Flask(__name__)
+timezone = pytz.timezone("Asia/Kolkata")
 app.secret_key = os.urandom(24)  # Changed secret key
 app.permanent_session_lifetime = timedelta(minutes=30)
 
