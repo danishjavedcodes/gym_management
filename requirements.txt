@@ -11,3 +11,4 @@ itsdangerous==2.1.2
 click==8.1.7
 numpy==1.26.4  # Updated to a compatible version with pandas 2.2.1
 gunicorn==21.2.0  # Added for Railway deployment
+pytz==2024.1
