@@ -17,7 +17,7 @@ import pytz
 
 
 app = Flask(__name__)
-timezone = pytz.timezone("Asia/Kolkata")
+timezone = pytz.timezone("Asia/Karachi")
 app.secret_key = os.urandom(24)  # Changed secret key
 app.permanent_session_lifetime = timedelta(minutes=30)
 
