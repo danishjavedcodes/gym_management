@@ -2,9 +2,18 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 import pandas as pd
 from datetime import datetime, timedelta
 import os
+from threading import Thread
+import time
 import logging
 import calendar
 import json  # Add this import
+from flask import send_file
+import xlsxwriter
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+import io
+
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Changed secret key
@@ -407,15 +416,21 @@ def mark_staff_attendance():
         return redirect(url_for('login'))
     
     try:
+        if not os.path.exists('data/trainer_attendance.xlsx'):
+            pd.DataFrame(columns=[
+                'date', 'trainer_id', 'trainer_name', 'staff_type', 'check_in', 'check_out'
+            ]).to_excel('data/trainer_attendance.xlsx', index=False)
+            
         staff_attendance_df = pd.read_excel('data/trainer_attendance.xlsx')
         staff_df = pd.read_excel('data/receptionists.xlsx')
         
-        # Ensure check_out column exists
-        if 'check_out' not in staff_attendance_df.columns:
-            staff_attendance_df['check_out'] = None
-        
         staff_id = request.form.get('staff_id')
         action = request.form.get('staff_attendance_action')
+        
+        if not staff_id:
+            flash('Staff ID is required')
+            return redirect(url_for('staff_attendance'))
+            
         staff_query = staff_df[staff_df['username'] == staff_id]
         
         if staff_query.empty:
@@ -426,42 +441,52 @@ def mark_staff_attendance():
         today = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H:%M:%S')
         
-        # Check if staff has already checked in today
+        # Convert date column to datetime if it exists
+        if 'date' in staff_attendance_df.columns:
+            staff_attendance_df['date'] = pd.to_datetime(staff_attendance_df['date']).dt.strftime('%Y-%m-%d')
+        
+        # Check today's attendance for this staff member
         today_attendance = staff_attendance_df[
             (staff_attendance_df['date'] == today) & 
             (staff_attendance_df['trainer_id'] == staff_id)
         ]
         
         if action == 'check_in':
-            if today_attendance.empty:
-                new_attendance = {
-                    'date': today,
-                    'trainer_id': staff_id,
-                    'trainer_name': staff['name'],
-                    'staff_type': staff['staff_type'],
-                    'check_in': current_time,
-                    'check_out': None
-                }
-                staff_attendance_df = pd.concat([staff_attendance_df, pd.DataFrame([new_attendance])], ignore_index=True)
-                flash('Staff check-in recorded successfully')
-            else:
-                flash('Staff member already checked in for today')
-        
+            if not today_attendance.empty:
+                if pd.isna(today_attendance.iloc[0]['check_out']):
+                    flash('You have already checked in and not checked out yet')
+                else:
+                    flash('You have already completed your attendance for today')
+                return redirect(url_for('staff_attendance'))
+                
+            new_attendance = {
+                'date': today,
+                'trainer_id': staff_id,
+                'trainer_name': staff['name'],
+                'staff_type': staff['staff_type'],
+                'check_in': current_time,
+                'check_out': None
+            }
+            staff_attendance_df = pd.concat([staff_attendance_df, pd.DataFrame([new_attendance])], ignore_index=True)
+            flash('Staff check-in recorded successfully')
+            
         elif action == 'check_out':
-            if not today_attendance.empty and pd.isna(today_attendance.iloc[0]['check_out']):
+            if today_attendance.empty:
+                flash('You need to check in first')
+            elif pd.notna(today_attendance.iloc[0]['check_out']):
+                flash('You have already checked out for today')
+            else:
                 staff_attendance_df.loc[
                     (staff_attendance_df['date'] == today) & 
                     (staff_attendance_df['trainer_id'] == staff_id),
                     'check_out'
                 ] = current_time
                 flash('Staff check-out recorded successfully')
-            else:
-                flash('No check-in record found for today or already checked out')
         
         staff_attendance_df.to_excel('data/trainer_attendance.xlsx', index=False)
         
     except Exception as e:
-        app.logger.error(f"Error marking staff attendance: {e}")
+        app.logger.error(f"Error marking staff attendance: {str(e)}")
         flash('Error marking staff attendance')
     
     return redirect(url_for('staff_attendance'))
@@ -472,7 +497,6 @@ def mark_attendance():
         return redirect(url_for('login'))
     
     try:
-        # Initialize attendance file if it doesn't exist
         if not os.path.exists('data/attendance.xlsx'):
             pd.DataFrame(columns=[
                 'date', 'member_id', 'member_name', 'check_in', 'check_out'
@@ -481,8 +505,12 @@ def mark_attendance():
         attendance_df = pd.read_excel('data/attendance.xlsx')
         members_df = pd.read_excel('data/members.xlsx')
         
+        # Convert date column to datetime if it exists
+        if 'date' in attendance_df.columns:
+            attendance_df['date'] = pd.to_datetime(attendance_df['date']).dt.strftime('%Y-%m-%d')
+        
         member_id = request.form.get('member_id')
-        action = request.form.get('action')  # Get the action (check_in or check_out)
+        action = request.form.get('action')
         current_date = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H:%M:%S')
         
@@ -772,6 +800,10 @@ def add_member():
     
 #     return redirect(url_for('payments'))
 
+
+
+
+
 @app.route('/custom_product', methods=['GET'])
 def custom_product_page():
     if 'user_type' not in session:
@@ -938,18 +970,25 @@ def mark_payment_as_paid():
 
 
 
+
+
 # Receptionist management routes
 @app.route('/admin/receptionists')
 def manage_receptionists():
     if 'user_type' not in session:
         return redirect(url_for('login'))
     
-    # Allow both admin and staff with staff management privilege
-    if session['user_type'] != 'admin' and 'staff' not in session.get('privileges', []):
-        flash('Access denied')
-        return redirect(url_for('staff_dashboard'))
-    
     try:
+        # Get and process privileges
+        privileges = session.get('privileges', '')
+        if isinstance(privileges, str):
+            privileges = [p.strip() for p in privileges.split(',') if p.strip()]
+        
+        # Check access rights
+        if session['user_type'] != 'admin' and 'staff' not in privileges:
+            flash('Access denied')
+            return redirect(url_for('staff_dashboard'))
+        
         # Create file if it doesn't exist
         if not os.path.exists('data/receptionists.xlsx'):
             df = pd.DataFrame(columns=[
@@ -962,56 +1001,92 @@ def manage_receptionists():
         staff_df = pd.read_excel('data/receptionists.xlsx')
         return render_template('admin/staff.html', 
                              staff=staff_df.to_dict('records'),
-                             is_admin=session['user_type'] == 'admin')
+                             is_admin=session['user_type'] == 'admin',
+                             user_privileges=privileges)
     except Exception as e:
         app.logger.error(f"Error loading staff data: {e}")
         flash('Error loading staff data')
-        return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('staff_dashboard'))
 
 @app.route('/admin/staff/add', methods=['POST'])
 def add_staff():
-    if 'user_type' not in session or session['user_type'] != 'admin':
+    if 'user_type' not in session:
         return redirect(url_for('login'))
     
     try:
+        # Get and process privileges
+        privileges = session.get('privileges', '')
+        if isinstance(privileges, str):
+            privileges = [p.strip() for p in privileges.split(',') if p.strip()]
+        
+        # Check access rights
+        if session['user_type'] != 'admin' and 'staff' not in privileges:
+            flash('Access denied')
+            return redirect(url_for('staff_dashboard'))
+            
+        # Create file if it doesn't exist
+        if not os.path.exists('data/receptionists.xlsx'):
+            initial_df = pd.DataFrame(columns=[
+                'username', 'password', 'name', 'phone', 'address', 
+                'dob', 'age', 'gender', 'salary', 'next_of_kin_name',
+                'next_of_kin_phone', 'privileges', 'staff_type'
+            ])
+            initial_df.to_excel('data/receptionists.xlsx', index=False)
+        
         receptionists_df = pd.read_excel('data/receptionists.xlsx')
         
-        # Updated permissions list with separated attendance types
-        permissions = []
-        if request.form.get('perm_members'): permissions.append('members')
-        if request.form.get('perm_member_attendance'): permissions.append('member_attendance')
-        if request.form.get('perm_staff_attendance'): permissions.append('staff_attendance')
-        if request.form.get('perm_payments'): permissions.append('payments')
-        if request.form.get('perm_reports'): permissions.append('reports')
+        # Get form data
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        name = request.form.get('name', '').strip()
         
+        # Validate required fields
+        if not username or not password or not name:
+            flash('Username, password, and name are required')
+            return redirect(url_for('manage_receptionists'))
+        
+        # Check for duplicate username
+        if username in receptionists_df['username'].values:
+            flash('Username already exists')
+            return redirect(url_for('manage_receptionists'))
+        
+        # Get permissions
+        permissions = []
+        for perm in ['members', 'member_attendance', 'staff_attendance', 
+                    'payments', 'reports', 'staff', 'sales', 
+                    'inventory', 'packages']:
+            if request.form.get(f'perm_{perm}'):
+                permissions.append(perm)
+        
+        # Create new staff record
         new_staff = {
-            'username': request.form.get('username'),
-            'password': request.form.get('password'),
-            'name': request.form.get('name'),
-            'phone': request.form.get('phone'),
-            'address': request.form.get('address'),
-            'dob': request.form.get('dob'),
-            'age': request.form.get('age'),
-            'gender': request.form.get('gender'),
-            'salary': request.form.get('salary'),
-            'next_of_kin_name': request.form.get('next_of_kin_name'),
-            'next_of_kin_phone': request.form.get('next_of_kin_phone'),
+            'username': username,
+            'password': password,
+            'name': name,
+            'phone': request.form.get('phone', ''),
+            'address': request.form.get('address', ''),
+            'dob': request.form.get('dob', ''),
+            'age': request.form.get('age', 0),
+            'gender': request.form.get('gender', ''),
+            'salary': request.form.get('salary', 0),
+            'next_of_kin_name': request.form.get('next_of_kin_name', ''),
+            'next_of_kin_phone': request.form.get('next_of_kin_phone', ''),
             'privileges': ','.join(permissions),
-            'staff_type': request.form.get('staff_type')
+            'staff_type': request.form.get('staff_type', 'staff')
         }
         
-        if new_staff['username'] in receptionists_df['username'].values:
-            flash('Username already exists')
-        else:
-            receptionists_df = pd.concat([receptionists_df, pd.DataFrame([new_staff])], 
-                                       ignore_index=True)
-            receptionists_df.to_excel('data/receptionists.xlsx', index=False)
-            flash('Staff member added successfully')
+        # Add new staff member
+        receptionists_df = pd.concat([receptionists_df, pd.DataFrame([new_staff])], 
+                                   ignore_index=True)
+        receptionists_df.to_excel('data/receptionists.xlsx', index=False)
+        flash('Staff member added successfully')
+        
     except Exception as e:
-        app.logger.error(f"Error adding staff member: {e}")
-        flash('Error adding staff member')
+        app.logger.error(f"Error adding staff member: {str(e)}")
+        flash(f'Error adding staff member: {str(e)}')
     
     return redirect(url_for('manage_receptionists'))
+
 
 @app.route('/admin/staff/edit/<username>', methods=['GET', 'POST'])
 def edit_staff(username):
@@ -1083,17 +1158,29 @@ def edit_staff(username):
 
 @app.route('/admin/receptionists/delete/<username>')
 def delete_receptionist(username):
-    if 'user_type' not in session or session['user_type'] != 'admin':
+    if 'user_type' not in session:
         return redirect(url_for('login'))
     
     try:
+        if not os.path.exists('data/receptionists.xlsx'):
+            flash('No staff records found')
+            return redirect(url_for('manage_receptionists'))
+        
         receptionists_df = pd.read_excel('data/receptionists.xlsx')
+        
+        # Check if staff member exists
+        if username not in receptionists_df['username'].values:
+            flash('Staff member not found')
+            return redirect(url_for('manage_receptionists'))
+        
+        # Delete staff member
         receptionists_df = receptionists_df[receptionists_df['username'] != username]
         receptionists_df.to_excel('data/receptionists.xlsx', index=False)
-        flash('Receptionist deleted successfully')
+        flash('Staff member deleted successfully')
+        
     except Exception as e:
-        app.logger.error(f"Error deleting receptionist: {e}")
-        flash('Error deleting receptionist')
+        app.logger.error(f"Error deleting staff member: {str(e)}")
+        flash('Error deleting staff member')
     
     return redirect(url_for('manage_receptionists'))
 
@@ -1104,99 +1191,136 @@ def reports():
         return redirect(url_for('login'))
     
     try:
-        members_df = pd.read_excel('data/members.xlsx')
-        payments_df = pd.read_excel('data/payments.xlsx')
-        attendance_df = pd.read_excel('data/attendance.xlsx')
+        selected_date = request.args.get('selected_date', datetime.now().strftime('%Y-%m'))
+        year, month = map(int, selected_date.split('-'))
         
-        # Current month revenue
-        current_month = datetime.now().strftime('%Y-%m')
-        monthly_revenue = float(payments_df[
-            payments_df['date'].astype(str).str.startswith(current_month)
-        ]['amount'].sum())
-        
-        # Past 6 months revenue
-        past_6_months = []
-        revenue_data = []
-        current_date = datetime.now()
-        
-        for i in range(6):
-            month_date = current_date - timedelta(days=30*i)
-            month_str = month_date.strftime('%Y-%m')
-            past_6_months.append(month_date.strftime('%B %Y'))
-            month_revenue = float(payments_df[
-                payments_df['date'].astype(str).str.startswith(month_str)
-            ]['amount'].sum())
-            revenue_data.append(month_revenue)
-        
-        past_6_months.reverse()
-        revenue_data.reverse()
-        
-        # Members by package - Convert to regular Python dict with int values
-        package_distribution = {
-            k: int(v) for k, v in members_df['package'].value_counts().to_dict().items()
-        }
-        
-        # Today's attendance
-        today = datetime.now().strftime('%Y-%m-%d')
-        today_attendance = int(len(attendance_df[attendance_df['date'] == today]))
-        
-        # Monthly attendance calendar
-        current_month_attendance = attendance_df[
-            attendance_df['date'].astype(str).str.startswith(current_month)
-        ]
-        attendance_by_date = {
-            k: int(v) for k, v in current_month_attendance.groupby('date').size().to_dict().items()
-        }
-        
-        # Get all dates of current month
-        year = datetime.now().year
-        month = datetime.now().month
-        num_days = calendar.monthrange(year, month)[1]
-        calendar_data = []
-        
-        for day in range(1, num_days + 1):
-            date_str = f"{year}-{month:02d}-{day:02d}"
-            calendar_data.append({
-                'date': date_str,
-                'count': attendance_by_date.get(date_str, 0)
-            })
-        
-        return render_template('reports.html',
-                             monthly_revenue=monthly_revenue,
-                             past_6_months=past_6_months,
-                             revenue_data=revenue_data,
-                             total_members=int(len(members_df)),
-                             package_distribution=package_distribution,
-                             today_attendance=today_attendance,
-                             calendar_data=calendar_data,
-                             current_month=datetime.now().strftime('%B %Y'))
-    except Exception as e:
-        app.logger.error(f"Error generating reports: {e}")
-        flash('Error generating reports')
-        return redirect(url_for('login'))
-        
-        # Monthly attendance with check-in/out times
-        current_month_attendance = attendance_df[
-            attendance_df['date'].astype(str).str.startswith(current_month)
-        ].sort_values('date', ascending=False)
-        
-        attendance_records = current_month_attendance.to_dict('records')
-        
-        return render_template('reports.html',
-                             monthly_revenue=monthly_revenue,
-                             past_6_months=past_6_months,
-                             revenue_data=revenue_data,
-                             total_members=int(len(members_df)),
-                             package_distribution=package_distribution,
-                             today_attendance=today_attendance,
-                             calendar_data=calendar_data,
-                             current_month=datetime.now().strftime('%B %Y'))
-    except Exception as e:
-        app.logger.error(f"Error generating reports: {e}")
-        flash('Error generating reports')
-        return redirect(url_for('login'))
+        # Read from backup file
+        backup_file = os.path.join('data', 'gym_data_backup.xlsx')
+        if not os.path.exists(backup_file):
+            flash('No backup data available')
+            return redirect(url_for('staff_dashboard'))
+            
+        # Staff Attendance from backup
+        staff_attendance_details = []
+        with pd.ExcelFile(backup_file) as xls:
+            attendance_df = pd.read_excel(xls, 'Staff Attendance')
+            staff_df = pd.read_excel(xls, 'Staff')
+            
+            # Convert date column to datetime
+            attendance_df['date'] = pd.to_datetime(attendance_df['date'])
+            
+            # Filter for selected month
+            month_mask = (
+                (attendance_df['date'].dt.year == year) & 
+                (attendance_df['date'].dt.month == month)
+            )
+            filtered_attendance = attendance_df[month_mask].copy()
+            
+            if not filtered_attendance.empty:
+                # Format date to string
+                filtered_attendance['date'] = filtered_attendance['date'].dt.strftime('%Y-%m-%d')
+                
+                # Create staff name mapping
+                staff_names = dict(zip(staff_df['username'], staff_df['name']))
+                
+                # Apply staff names mapping
+                filtered_attendance['staff_name'] = filtered_attendance['trainer_id'].map(
+                    lambda x: staff_names.get(x, x) if pd.notna(x) else 'Unknown'
+                )
+                
+                # Select and order columns
+                staff_attendance_details = filtered_attendance[[
+                    'date', 'staff_name', 'check_in', 'check_out'
+                ]].to_dict('records')
+                
+                # Sort by date and check_in time
+                staff_attendance_details = sorted(
+                    staff_attendance_details,
+                    key=lambda x: (x['date'], x['check_in'] if pd.notna(x['check_in']) else '')
+                )
 
-# Inventory management routes
+        # Revenue calculations from backup
+        monthly_revenue = 0
+        monthly_sales_revenue = 0
+        
+        with pd.ExcelFile(backup_file) as xls:
+            # Package payments
+            payments_df = pd.read_excel(xls, 'Payments')
+            payments_df['date'] = pd.to_datetime(payments_df['date'])
+            month_mask = (
+                (payments_df['date'].dt.year == year) & 
+                (payments_df['date'].dt.month == month)
+            )
+            monthly_payments = payments_df[month_mask]
+            monthly_revenue = float(monthly_payments['amount'].sum()) if not monthly_payments.empty else 0
+
+            # Sales revenue
+            sales_df = pd.read_excel(xls, 'Sales')
+            sales_df['date'] = pd.to_datetime(sales_df['date'])
+            month_mask = (
+                (sales_df['date'].dt.year == year) & 
+                (sales_df['date'].dt.month == month)
+            )
+            monthly_sales = sales_df[month_mask]
+            monthly_sales_revenue = float(monthly_sales['total_amount'].sum()) if not monthly_sales.empty else 0
+
+        total_revenue = monthly_revenue + monthly_sales_revenue
+
+        # Member Attendance from backup
+        with pd.ExcelFile(backup_file) as xls:
+            member_df = pd.read_excel(xls, 'Member Attendance')
+            member_df['date'] = pd.to_datetime(member_df['date'])
+            month_mask = (
+                (member_df['date'].dt.year == year) & 
+                (member_df['date'].dt.month == month)
+            )
+            member_attendance_details = member_df[month_mask].to_dict('records')
+
+        # Sales Details from backup
+        sales_details = []
+        with pd.ExcelFile(backup_file) as xls:
+            sales_df = pd.read_excel(xls, 'Sales')
+            sales_df['date'] = pd.to_datetime(sales_df['date'])
+            month_mask = (
+                (sales_df['date'].dt.year == year) & 
+                (sales_df['date'].dt.month == month)
+            )
+            monthly_sales = sales_df[month_mask]
+            
+            for _, row in monthly_sales.iterrows():
+                sale_record = row.to_dict()
+                try:
+                    if pd.notna(sale_record.get('items_details')):
+                        items_data = json.loads(sale_record['items_details'])
+                        formatted_items = []
+                        for item in items_data:
+                            if isinstance(item, dict):
+                                formatted_items.append(f"• {item['name']} (x{item['quantity']})")
+                        sale_record['items_display'] = '\n'.join(formatted_items) if formatted_items else 'No items'
+                    else:
+                        sale_record['items_display'] = 'No items'
+                except Exception as e:
+                    app.logger.error(f"Error processing items for sale {sale_record.get('id', 'unknown')}: {e}")
+                    sale_record['items_display'] = 'Error processing items'
+                
+                sales_details.append(sale_record)
+
+        return render_template('reports.html',
+                             selected_date=selected_date,
+                             current_month_year=datetime.now().strftime('%Y-%m'),
+                             monthly_revenue=monthly_revenue,
+                             monthly_sales_revenue=monthly_sales_revenue,
+                             total_revenue=total_revenue,
+                             staff_attendance_details=staff_attendance_details,
+                             member_attendance_details=member_attendance_details,
+                             sales_details=sales_details)
+
+    except Exception as e:
+        app.logger.error(f"Error in reports: {str(e)}")
+        flash('Error loading reports')
+        return redirect(url_for('staff_dashboard'))
+
+
 @app.route('/inventory')
 def inventory():
     if 'user_type' not in session:
@@ -1463,6 +1587,7 @@ def sales_report():
         flash('Error generating sales report')
         return redirect(url_for('sales'))
 
+
 @app.route('/receipt/download', methods=['POST'])
 def download_receipt():
     receipt_id = request.form.get('receipt_id')
@@ -1498,6 +1623,8 @@ def view_receipt(sale_id):
         app.logger.error(f"Error viewing receipt: {str(e)}")
         flash('Error viewing receipt')
         return redirect(url_for('sales'))
+
+        
 @app.route('/change_password', methods=['GET', 'POST'])
 def change_password():
     if 'user_type' not in session:
@@ -1537,6 +1664,214 @@ def change_password():
     return render_template('change_password.html')
 
 
+# #backup
+# def create_daily_backup():
+#     try:
+#         data_path = 'data'
+#         backup_file = os.path.join(data_path, 'gym_data_backup.xlsx')
+        
+#         # First load existing backup if it exists
+#         backup_data = {}
+#         if os.path.exists(backup_file):
+#             with pd.ExcelFile(backup_file) as xls:
+#                 for sheet_name in xls.sheet_names:
+#                     backup_data[sheet_name] = pd.read_excel(xls, sheet_name)
+
+#         with pd.ExcelWriter(backup_file, engine='openpyxl') as writer:
+#             # Members - Merge with existing backup
+#             current_members = pd.read_excel(os.path.join(data_path, 'members.xlsx'))
+#             if 'Members' in backup_data:
+#                 all_members = pd.concat([backup_data['Members'], current_members]).drop_duplicates(subset=['member_id'], keep='last')
+#             else:
+#                 all_members = current_members
+#             all_members.to_excel(writer, sheet_name='Members', index=False)
+
+#             # Staff - Merge with existing backup
+#             current_staff = pd.read_excel(os.path.join(data_path, 'receptionists.xlsx'))
+#             if 'Staff' in backup_data:
+#                 all_staff = pd.concat([backup_data['Staff'], current_staff]).drop_duplicates(subset=['username'], keep='last')
+#             else:
+#                 all_staff = current_staff
+#             all_staff.to_excel(writer, sheet_name='Staff', index=False)
+
+#             # Attendance - Append new records
+#             current_attendance = pd.read_excel(os.path.join(data_path, 'attendance.xlsx'))
+#             if 'Member Attendance' in backup_data:
+#                 all_attendance = pd.concat([backup_data['Member Attendance'], current_attendance]).drop_duplicates()
+#             else:
+#                 all_attendance = current_attendance
+#             all_attendance.to_excel(writer, sheet_name='Member Attendance', index=False)
+
+#             # Staff Attendance - Append new records
+#             current_staff_attendance = pd.read_excel(os.path.join(data_path, 'trainer_attendance.xlsx'))
+#             if 'Staff Attendance' in backup_data:
+#                 all_staff_attendance = pd.concat([backup_data['Staff Attendance'], current_staff_attendance]).drop_duplicates()
+#             else:
+#                 all_staff_attendance = current_staff_attendance
+#             all_staff_attendance.to_excel(writer, sheet_name='Staff Attendance', index=False)
+
+#             # Payments - Append new records
+#             current_payments = pd.read_excel(os.path.join(data_path, 'payments.xlsx'))
+#             if 'Payments' in backup_data:
+#                 all_payments = pd.concat([backup_data['Payments'], current_payments]).drop_duplicates()
+#             else:
+#                 all_payments = current_payments
+#             all_payments.to_excel(writer, sheet_name='Payments', index=False)
+
+#             # Inventory - Keep all items
+#             current_inventory = pd.read_excel(os.path.join(data_path, 'inventory.xlsx'))
+#             if 'Inventory' in backup_data:
+#                 all_inventory = pd.concat([backup_data['Inventory'], current_inventory]).drop_duplicates(subset=['id'], keep='last')
+#             else:
+#                 all_inventory = current_inventory
+#             all_inventory.to_excel(writer, sheet_name='Inventory', index=False)
+
+#             # Custom Products - Keep all products
+#             current_products = pd.read_excel(os.path.join(data_path, 'custom_products.xlsx'))
+#             if 'Custom Products' in backup_data:
+#                 all_products = pd.concat([backup_data['Custom Products'], current_products]).drop_duplicates(subset=['product_id'], keep='last')
+#             else:
+#                 all_products = current_products
+#             all_products.to_excel(writer, sheet_name='Custom Products', index=False)
+
+#             # Sales - Append new records
+#             current_sales = pd.read_excel(os.path.join(data_path, 'sales.xlsx'))
+#             if 'Sales' in backup_data:
+#                 all_sales = pd.concat([backup_data['Sales'], current_sales]).drop_duplicates()
+#             else:
+#                 all_sales = current_sales
+#             all_sales.to_excel(writer, sheet_name='Sales', index=False)
+
+#             # Packages - Keep all packages
+#             current_packages = pd.read_excel(os.path.join(data_path, 'packages.xlsx'))
+#             if 'Packages' in backup_data:
+#                 all_packages = pd.concat([backup_data['Packages'], current_packages]).drop_duplicates(subset=['name'], keep='last')
+#             else:
+#                 all_packages = current_packages
+#             all_packages.to_excel(writer, sheet_name='Packages', index=False)
+
+#         app.logger.info(f"Daily backup created successfully at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+#     except Exception as e:
+#         app.logger.error(f"Error creating daily backup: {str(e)}")
+
+# # Schedule the backup to run at midnight every day
+# def schedule_backup():
+#     while True:
+#         now = datetime.now()
+#         # Calculate time until next midnight
+#         next_run = (now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
+#         delay = (next_run - now).total_seconds()
+#         time.sleep(delay)
+#         create_daily_backup()
+
+
+# Thread(target=schedule_backup, daemon=True).start()
+
+
+
+# Remove the scheduling code and modify backup handling
+def create_backup():
+    try:
+        data_path = 'data'
+        backup_file = os.path.join(data_path, 'gym_data_backup.xlsx')
+        
+        # First load existing backup if it exists
+        backup_data = {}
+        if os.path.exists(backup_file):
+            with pd.ExcelFile(backup_file) as xls:
+                for sheet_name in xls.sheet_names:
+                    backup_data[sheet_name] = pd.read_excel(xls, sheet_name)
+
+        with pd.ExcelWriter(backup_file, engine='openpyxl', mode='w') as writer:
+            # Members - Merge with existing backup
+            current_members = pd.read_excel(os.path.join(data_path, 'members.xlsx'))
+            current_members.to_excel(writer, sheet_name='Members', index=False)
+
+            # Staff - Merge with existing backup
+            current_staff = pd.read_excel(os.path.join(data_path, 'receptionists.xlsx'))
+            current_staff.to_excel(writer, sheet_name='Staff', index=False)
+
+            # Attendance - Append new records
+            current_attendance = pd.read_excel(os.path.join(data_path, 'attendance.xlsx'))
+            current_attendance.to_excel(writer, sheet_name='Member Attendance', index=False)
+
+            # Staff Attendance - Append new records
+            current_staff_attendance = pd.read_excel(os.path.join(data_path, 'trainer_attendance.xlsx'))
+            current_staff_attendance.to_excel(writer, sheet_name='Staff Attendance', index=False)
+
+            # Payments - Append new records
+            current_payments = pd.read_excel(os.path.join(data_path, 'payments.xlsx'))
+            current_payments.to_excel(writer, sheet_name='Payments', index=False)
+
+            # Inventory - Keep all items
+            current_inventory = pd.read_excel(os.path.join(data_path, 'inventory.xlsx'))
+            current_inventory.to_excel(writer, sheet_name='Inventory', index=False)
+
+            # Custom Products - Keep all products
+            current_products = pd.read_excel(os.path.join(data_path, 'custom_products.xlsx'))
+            current_products.to_excel(writer, sheet_name='Custom Products', index=False)
+
+            # Sales - Append new records
+            current_sales = pd.read_excel(os.path.join(data_path, 'sales.xlsx'))
+            current_sales.to_excel(writer, sheet_name='Sales', index=False)
+
+            # Packages - Keep all packages
+            current_packages = pd.read_excel(os.path.join(data_path, 'packages.xlsx'))
+            current_packages.to_excel(writer, sheet_name='Packages', index=False)
+
+        app.logger.info(f"Backup created successfully at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+    except Exception as e:
+        app.logger.error(f"Error creating backup: {str(e)}")
+
+# Create backup immediately when server starts
+create_backup()
+
+
+@app.route('/download_report/<type>/<date>')
+def download_report(type, date):
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        # Load data from backup file
+        backup_file = os.path.join('data', 'gym_data_backup.xlsx')
+        if not os.path.exists(backup_file):
+            flash('No backup data available')
+            return redirect(url_for('reports'))
+
+        # Create Excel file in memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            with pd.ExcelFile(backup_file) as xls:
+                # Process each sheet from backup
+                for sheet_name in xls.sheet_names:
+                    df = pd.read_excel(xls, sheet_name)
+                    
+                    # Filter by date if the sheet has a date column
+                    if 'date' in df.columns:
+                        df['date'] = pd.to_datetime(df['date'])
+                        month_mask = df['date'].dt.strftime('%Y-%m') == date
+                        df = df[month_mask]
+                    
+                    # Write to new Excel file
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+        
+        output.seek(0)
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'gym_report_{date}.xlsx'
+        )
+            
+    except Exception as e:
+        app.logger.error(f"Error generating report: {str(e)}")
+        flash('Error generating report')
+        return redirect(url_for('reports'))
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
 
@@ -1551,3 +1886,5 @@ def api_inventory():
     except Exception as e:
         app.logger.error(f"Error fetching inventory data: {e}")
         return json.dumps([])
+
+
