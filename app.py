@@ -1512,7 +1512,7 @@ def add_sale():
         # Create sale record
         new_sale = {
             'id': new_id,
-            'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'date': datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S'),
             'staff_name': session.get('username'),
             'total_amount': total_amount,
             'payment_method': payment_method,
@@ -1770,6 +1770,14 @@ def change_password():
 
 
 # Remove the scheduling code and modify backup handling
+# Add this near the top of the file, after other imports
+from datetime import datetime, timedelta
+import pytz
+
+# Define timezone
+IST = pytz.timezone('Asia/Kolkata')  # UTC+05:30
+
+# Update the create_backup function
 def create_backup():
     try:
         data_path = 'data'
@@ -1819,7 +1827,9 @@ def create_backup():
             current_packages = pd.read_excel(os.path.join(data_path, 'packages.xlsx'))
             current_packages.to_excel(writer, sheet_name='Packages', index=False)
 
-        app.logger.info(f"Backup created successfully at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        # Update timestamp with timezone
+        current_time = datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S %Z')
+        app.logger.info(f"Backup created successfully at {current_time}")
         
     except Exception as e:
         app.logger.error(f"Error creating backup: {str(e)}")
