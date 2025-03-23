@@ -14,7 +14,7 @@
                         <select class="form-control" id="member_id" name="member_id" required>
                             <option value="">Select a member...</option>
                             {% for member in members %}
-                            <option value="{{ member.id }}">{{ member.name }}</option>
+                            <option value="{{ member.member_id }}">{{ member.name }}</option>
                             {% endfor %}
                         </select>
                     </div>

@@ -353,28 +353,24 @@ def attendance():
     if 'user_type' not in session:
         return redirect(url_for('login'))
     
-    # Allow both admin and staff with member_attendance privilege
-    if session['user_type'] != 'admin' and 'member_attendance' not in session.get('privileges', []):
-        flash('Access denied')
-        return redirect(url_for('staff_dashboard'))
-    
     try:
+        # Load members and attendance data
         members_df = pd.read_excel('data/members.xlsx')
-        attendance_df = pd.read_excel('data/attendance.xlsx')
+        attendance_df = pd.read_excel('data/attendance.xlsx') if os.path.exists('data/attendance.xlsx') else pd.DataFrame()
         
+        # Get today's date
         today = datetime.now().strftime('%Y-%m-%d')
-        today_attendance = attendance_df[attendance_df['date'] == today]
         
-        # Get member IDs who have checked in today
-        checked_in_members = today_attendance['member_id'].tolist()
+        # Filter today's attendance
+        today_attendance = attendance_df[attendance_df['date'] == today] if not attendance_df.empty else pd.DataFrame()
         
         return render_template('attendance.html',
                              members=members_df.to_dict('records'),
-                             checked_in_members=checked_in_members,
-                             today=today)
+                             attendance=today_attendance.to_dict('records'),  # Changed from today_attendance to attendance
+                             current_date=today)
     except Exception as e:
-        app.logger.error(f"Error loading member attendance: {e}")
-        flash('Error loading member data')
+        app.logger.error(f"Error loading attendance page: {e}")
+        flash('Error loading attendance data')
         return redirect(url_for('staff_dashboard'))
 
 @app.route('/staff_attendance')
@@ -476,57 +472,68 @@ def mark_attendance():
         return redirect(url_for('login'))
     
     try:
+        # Initialize attendance file if it doesn't exist
+        if not os.path.exists('data/attendance.xlsx'):
+            pd.DataFrame(columns=[
+                'date', 'member_id', 'member_name', 'check_in', 'check_out'
+            ]).to_excel('data/attendance.xlsx', index=False)
+        
         attendance_df = pd.read_excel('data/attendance.xlsx')
         members_df = pd.read_excel('data/members.xlsx')
         
-        # Ensure check_out column exists
-        if 'check_out' not in attendance_df.columns:
-            attendance_df['check_out'] = None
-        
         member_id = request.form.get('member_id')
-        member_query = members_df[members_df['id'].astype(str) == str(member_id)]
-        
-        if member_query.empty:
-            flash('Member not found')
-            return redirect(url_for('attendance'))
-        
-        member = member_query.iloc[0]
-        today = datetime.now().strftime('%Y-%m-%d')
+        action = request.form.get('action')  # Get the action (check_in or check_out)
+        current_date = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H:%M:%S')
         
-        # Check if member has already checked in today
+        # Convert member_id to string for comparison
+        member_id_str = str(member_id)
+        members_df['member_id'] = members_df['member_id'].astype(str)
+        
+        # Find member
+        member = members_df[members_df['member_id'] == member_id_str].iloc[0]
+        
+        # Check today's attendance for this member
         today_attendance = attendance_df[
-            (attendance_df['date'] == today) & 
-            (attendance_df['member_id'].astype(str) == str(member_id))
+            (attendance_df['member_id'].astype(str) == member_id_str) & 
+            (attendance_df['date'] == current_date)
         ]
         
-        if today_attendance.empty:
-            # Check in
+        if action == 'check_in':
+            if not today_attendance.empty:
+                flash(f'Member {member["name"]} has already checked in today')
+                return redirect(url_for('attendance'))
+            
+            # Mark check-in
             new_attendance = {
-                'date': today,
-                'member_id': str(member_id),
+                'date': current_date,
+                'member_id': member_id_str,
                 'member_name': member['name'],
                 'check_in': current_time,
                 'check_out': None
             }
             attendance_df = pd.concat([attendance_df, pd.DataFrame([new_attendance])], ignore_index=True)
-            flash('Check-in recorded successfully')
-        else:
-            # Check out
-            if pd.isna(today_attendance.iloc[0]['check_out']):
-                attendance_df.loc[
-                    (attendance_df['date'] == today) & 
-                    (attendance_df['member_id'].astype(str) == str(member_id)),
-                    'check_out'
-                ] = current_time
-                flash('Check-out recorded successfully')
-            else:
-                flash('Member has already completed attendance for today')
+            flash(f'Attendance marked for {member["name"]}')
+            
+        elif action == 'check_out':
+            if today_attendance.empty:
+                flash(f'Member {member["name"]} has not checked in today')
+                return redirect(url_for('attendance'))
+            
+            if pd.notna(today_attendance.iloc[0]['check_out']):
+                flash(f'Member {member["name"]} has already checked out today')
+                return redirect(url_for('attendance'))
+            
+            # Mark check-out
+            mask = (attendance_df['member_id'].astype(str) == member_id_str) & (attendance_df['date'] == current_date)
+            attendance_df.loc[mask, 'check_out'] = current_time
+            flash(f'Check-out marked for {member["name"]}')
         
         attendance_df.to_excel('data/attendance.xlsx', index=False)
+        
     except Exception as e:
-        app.logger.error(f"Error marking attendance: {e}")
-        flash('Error marking attendance')
+        app.logger.error(f"Error marking attendance: {str(e)}")
+        flash(f'Error marking attendance: {str(e)}')
     
     return redirect(url_for('attendance'))
 
