@@ -21,7 +21,7 @@
                     <h2 class="mb-3">Fitness Base GYM</h2>
                     <hr class="my-3">
                     <p class="mb-1"><strong>Receipt #{{ receipt.id }}</strong></p>
-                    <p class="mb-1">Date: {{ receipt.date }}</p>
+                    <p class="mb-1">Date: {{ receipt.date.split(' ')[0] if ' ' in receipt.date else receipt.date }}</p>
                     <p class="mb-1">Staff: {{ receipt.staff_name }}</p>
                 </div>
 

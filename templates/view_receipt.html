@@ -24,7 +24,7 @@
                 <div class="text-center mb-4">
                     <h4>Fitness Base</h4>
                     <p>Receipt #{{ receipt.id }}</p>
-                    <p>Date: {{ receipt.date }}</p>
+                    <p>Date: {{ receipt.date.split(' ')[0] if ' ' in receipt.date else receipt.date }}</p>
                     <p>Staff: {{ receipt.staff_name }}</p>
                 </div>
 
