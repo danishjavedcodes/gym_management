@@ -371,7 +371,7 @@ def attendance():
         attendance_df = pd.read_excel('data/attendance.xlsx') if os.path.exists('data/attendance.xlsx') else pd.DataFrame()
         
         # Get today's date
-        today = datetime.now().strftime('%Y-%m-%d')
+        today = datetime.now().strftime('%d-%m-%Y')
         
         # Filter today's attendance
         today_attendance = attendance_df[attendance_df['date'] == today] if not attendance_df.empty else pd.DataFrame()
@@ -399,7 +399,7 @@ def staff_attendance():
         staff_df = pd.read_excel('data/receptionists.xlsx')
         staff_attendance_df = pd.read_excel('data/trainer_attendance.xlsx')
         
-        today = datetime.now().strftime('%Y-%m-%d')
+        today = datetime.now().strftime('%d-%m-%Y')
         today_staff_attendance = staff_attendance_df[staff_attendance_df['date'] == today]
         
         return render_template('staff_attendance.html',
@@ -441,7 +441,7 @@ def mark_staff_attendance():
             return redirect(url_for('staff_attendance'))
         
         staff = staff_query.iloc[0]
-        today = datetime.now().strftime('%Y-%m-%d')
+        today = datetime.now().strftime('%d-%m-%Y')
         current_time = datetime.now().strftime('%H:%M:%S')
         
         # Convert date column to datetime if it exists
@@ -744,7 +744,7 @@ def add_member():
             'dob': request.form.get('dob'),
             'address': request.form.get('address'),
             'package': request.form.get('package'),
-            'join_date': datetime.now().strftime('%Y-%m-%d'),
+            'join_date': datetime.now().strftime('%d-%m-%Y'),
             'next_of_kin_name': request.form.get('kin_name'),
             'next_of_kin_phone': request.form.get('kin_phone'),
             'medical_conditions': request.form.get('medical_conditions'),
@@ -869,7 +869,7 @@ def add_custom_product():
             'final_price': final_price,
             'profit': profit,
             'created_by': session.get('username', 'admin'),
-            'creation_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'creation_date': datetime.now().strftime('%d-%m-%Y %H:%M:%S')
         }
 
         # Add to DataFrame and save
@@ -944,7 +944,7 @@ def mark_payment_as_paid():
         package_price = package_row['price'].iloc[0]
         
         # Create new payment record
-        payment_date = datetime.now().strftime('%Y-%m-%d')
+        payment_date = datetime.now().strftime('%d-%m-%Y')
         new_payment = {
             'date': payment_date,
             'member_id': member_id_str,
@@ -1221,7 +1221,7 @@ def reports():
             
             if not filtered_attendance.empty:
                 # Format date to string
-                filtered_attendance['date'] = filtered_attendance['date'].dt.strftime('%Y-%m-%d')
+                filtered_attendance['date'] = filtered_attendance['date'].dt.strftime('%d-%m-%Y')
                 
                 # Create staff name mapping
                 staff_names = dict(zip(staff_df['username'], staff_df['name']))
@@ -1310,7 +1310,7 @@ def reports():
 
         return render_template('reports.html',
                              selected_date=selected_date,
-                             current_month_year=datetime.now().strftime('%Y-%m'),
+                             current_month_year=datetime.now().strftime('%m-%Y'),
                              monthly_revenue=monthly_revenue,
                              monthly_sales_revenue=monthly_sales_revenue,
                              total_revenue=total_revenue,
@@ -1354,7 +1354,7 @@ def add_inventory():
             'cost_per_serving': float(request.form.get('cost_per_serving')),
             'profit_per_serving': float(request.form.get('profit_per_serving')),
             'other_charges': float(request.form.get('other_charges')),
-            'date_added': datetime.now().strftime('%Y-%m-%d')
+            'date_added': datetime.now().strftime('%d-%m-%Y')
         }
         
         inventory_df = pd.concat([inventory_df, pd.DataFrame([new_item])], ignore_index=True)
@@ -1515,7 +1515,7 @@ def add_sale():
         # Create sale record
         new_sale = {
             'id': new_id,
-            'date': datetime.now(PKT).strftime('%Y-%m-%d %H:%M:%S'),
+            'date': datetime.now(PKT).strftime('%d-%m-%Y %H:%M:%S'),
             'staff_name': session.get('username'),
             'total_amount': total_amount,
             'payment_method': payment_method,
