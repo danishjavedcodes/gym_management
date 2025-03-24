@@ -446,7 +446,7 @@ def mark_staff_attendance():
         
         # Convert date column to datetime if it exists
         if 'date' in staff_attendance_df.columns:
-            staff_attendance_df['date'] = pd.to_datetime(staff_attendance_df['date']).dt.strftime('%Y-%m-%d')
+            staff_attendance_df['date'] = pd.to_datetime(staff_attendance_df['date']).dt.strftime('%d-%m-%Y')
         
         # Check today's attendance for this staff member
         today_attendance = staff_attendance_df[
@@ -510,11 +510,11 @@ def mark_attendance():
         
         # Convert date column to datetime if it exists
         if 'date' in attendance_df.columns:
-            attendance_df['date'] = pd.to_datetime(attendance_df['date']).dt.strftime('%Y-%m-%d')
+            attendance_df['date'] = pd.to_datetime(attendance_df['date']).dt.strftime('%d-%m-%Y')
         
         member_id = request.form.get('member_id')
         action = request.form.get('action')
-        current_date = datetime.now().strftime('%Y-%m-%d')
+        current_date = datetime.now().strftime('%d-%m-%Y')
         current_time = datetime.now().strftime('%H:%M:%S')
         
         # Convert member_id to string for comparison
@@ -1194,7 +1194,7 @@ def reports():
         return redirect(url_for('login'))
     
     try:
-        selected_date = request.args.get('selected_date', datetime.now().strftime('%Y-%m'))
+        selected_date = request.args.get('selected_date', datetime.now().strftime('%m-%Y'))
         year, month = map(int, selected_date.split('-'))
         
         # Read from backup file
@@ -1554,8 +1554,8 @@ def sales_report():
         sales_df = pd.read_excel('data/sales.xlsx')
         
         # Get date range from query parameters or use current date
-        start_date = request.args.get('start_date', datetime.now().strftime('%Y-%m-%d'))
-        end_date = request.args.get('end_date', datetime.now().strftime('%Y-%m-%d'))
+        start_date = request.args.get('start_date', datetime.now().strftime('%d-%m-%Y'))
+        end_date = request.args.get('end_date', datetime.now().strftime('%d-%m-%Y'))
         
         # Filter sales by date range
         filtered_sales = sales_df[
@@ -1831,7 +1831,7 @@ def create_backup():
             current_packages.to_excel(writer, sheet_name='Packages', index=False)
 
         # Update timestamp with timezone
-        current_time = datetime.now(PKT).strftime('%Y-%m-%d %H:%M:%S %Z')
+        current_time = datetime.now(PKT).strftime('%d-%m-%Y %H:%M:%S %Z')
         app.logger.info(f"Backup created successfully at {current_time}")
         
     except Exception as e:
@@ -1864,7 +1864,7 @@ def download_report(type, date):
                     # Filter by date if the sheet has a date column
                     if 'date' in df.columns:
                         df['date'] = pd.to_datetime(df['date'])
-                        month_mask = df['date'].dt.strftime('%Y-%m') == date
+                        month_mask = df['date'].dt.strftime('%m-%Y') == date
                         df = df[month_mask]
                     
                     # Write to new Excel file
