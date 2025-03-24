@@ -213,7 +213,7 @@ def admin_dashboard():
         stats = {
             'total_members': len(members_df),
             'monthly_revenue': payments_df[
-                payments_df['date'].astype(str).str.startswith(datetime.now().strftime('%Y-%m'))
+                payments_df['date'].astype(str).str.startswith(datetime.now().strftime('%d-%m-%Y'))
             ]['amount'].sum(),
             'total_packages': len(packages_df),
             'total_receptionists': len(receptionists_df)
@@ -781,7 +781,7 @@ def add_member():
 #         member = members_df[members_df['id'].astype(str) == str(member_id)].iloc[0]
         
 #         new_payment = {
-#             'date': datetime.now().strftime('%Y-%m-%d'),
+#             'date': datetime.now().strftime('%d-%m-%Y'),
 #             'member_id': member_id,
 #             'member_name': member['name'],
 #             'package': member['package'],
@@ -1753,7 +1753,7 @@ def change_password():
 #                 all_packages = current_packages
 #             all_packages.to_excel(writer, sheet_name='Packages', index=False)
 
-#         app.logger.info(f"Daily backup created successfully at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+#         app.logger.info(f"Daily backup created successfully at {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
 #     except Exception as e:
 #         app.logger.error(f"Error creating daily backup: {str(e)}")
 
