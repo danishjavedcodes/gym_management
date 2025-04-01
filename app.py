@@ -697,12 +697,39 @@ def payments():
         members_df = pd.read_excel('data/members.xlsx')
         packages_df = pd.read_excel('data/packages.xlsx')
         
+        # Create a dictionary of package durations
+        package_durations = dict(zip(packages_df['name'], packages_df['duration']))
+        
+        # Convert payment dates to datetime
+        payments_df['date'] = pd.to_datetime(payments_df['date'], format='%d-%m-%Y')
+        
+        # Calculate remaining days for each payment
+        current_date = datetime.now()
+        payments_list = []
+        
+        for _, payment in payments_df.iterrows():
+            payment_dict = payment.to_dict()
+            
+            # Calculate expiry date based on package duration
+            package_duration = package_durations.get(payment['package'], 0)
+            expiry_date = payment['date'] + timedelta(days=package_duration * 30)  # Assuming 30 days per month
+            
+            # Calculate remaining days
+            remaining_days = (expiry_date - current_date).days
+            payment_dict['remaining_days'] = max(0, remaining_days)  # Don't show negative days
+            
+            # Convert date back to string format for display
+            payment_dict['date'] = payment['date'].strftime('%d-%m-%Y')
+            
+            payments_list.append(payment_dict)
+        
         packages = dict(zip(packages_df['name'], packages_df['price']))
         
         return render_template('payments.html',
-                             payments=payments_df.to_dict('records'),
+                             payments=payments_list,
                              members=members_df.to_dict('records'),
                              packages=packages)
+                             
     except Exception as e:
         app.logger.error(f"Error loading payments: {e}")
         flash('Error loading payments')

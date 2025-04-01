@@ -18,6 +18,7 @@
                         <th>Package</th>
                         <th>Amount</th>
                         <th>Status</th>
+                        <th>Remaining Days</th>  <!-- New column -->
                     </tr>
                 </thead>
                 <tbody>
@@ -28,6 +29,7 @@
                         <td>{{ payment.package }}</td>
                         <td>Rs. {{ payment.amount }}</td>
                         <td>{{ payment.status }}</td>
+                        <td>{{ payment.remaining_days }} days</td>  <!-- New column -->
                     </tr>
                     {% endfor %}
                 </tbody>
