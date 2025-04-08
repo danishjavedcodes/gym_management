@@ -197,7 +197,6 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# This duplicate route and keep only one instance
 @app.route('/admin/dashboard')
 def admin_dashboard():
     if 'user_type' not in session or session['user_type'] != 'admin':
@@ -681,59 +680,67 @@ def edit_package(name):
         return redirect(url_for('packages'))
 
 
-
-@app.route('/payments')
+@app.route('/payments', methods=['GET', 'POST'])
 def payments():
     if 'user_type' not in session:
         return redirect(url_for('login'))
-    
-    # Check for both admin and staff with payments privilege
-    if session['user_type'] != 'admin' and 'payments' not in session.get('privileges', []):
-        flash('Access denied')
-        return redirect(url_for('staff_dashboard'))
-    
+
     try:
+        # Load all required data
         payments_df = pd.read_excel('data/payments.xlsx')
-        members_df = pd.read_excel('data/members.xlsx')
         packages_df = pd.read_excel('data/packages.xlsx')
-        
-        # Create a dictionary of package durations
-        package_durations = dict(zip(packages_df['name'], packages_df['duration']))
-        
-        # Convert payment dates to datetime
-        payments_df['date'] = pd.to_datetime(payments_df['date'], format='%d-%m-%Y')
-        
-        # Calculate remaining days for each payment
-        current_date = datetime.now()
+        members_df = pd.read_excel('data/members.xlsx')
+
+        # Create packages dictionary
+        packages = dict(zip(packages_df['name'], packages_df['price']))
+
+        # Process payments data
         payments_list = []
         
-        for _, payment in payments_df.iterrows():
-            payment_dict = payment.to_dict()
+        # Process each member's payment status
+        for _, member in members_df.iterrows():
+            member_payments = payments_df[payments_df['member_id'].astype(str) == str(member['member_id'])]
             
-            # Calculate expiry date based on package duration
-            package_duration = package_durations.get(payment['package'], 0)
-            expiry_date = payment['date'] + timedelta(days=package_duration * 30)  # Assuming 30 days per month
-            
-            # Calculate remaining days
-            remaining_days = (expiry_date - current_date).days
-            payment_dict['remaining_days'] = max(0, remaining_days)  # Don't show negative days
-            
-            # Convert date back to string format for display
-            payment_dict['date'] = payment['date'].strftime('%d-%m-%Y')
-            
-            payments_list.append(payment_dict)
-        
-        packages = dict(zip(packages_df['name'], packages_df['price']))
-        
+            if not member_payments.empty:
+                latest_payment = member_payments.iloc[-1]
+                payment_dict = latest_payment.to_dict()
+                
+                # Calculate remaining days
+                if pd.notna(payment_dict.get('date')):
+                    payment_date = pd.to_datetime(payment_dict['date'], format='%d-%m-%Y')
+                    package_info = packages_df[packages_df['name'] == payment_dict['package']]
+                    if not package_info.empty:
+                        package_duration = int(package_info.iloc[0]['duration'])
+                        expiry_date = payment_date + pd.DateOffset(months=package_duration)
+                        remaining_days = (expiry_date - datetime.now()).days
+                        
+                        payment_dict['remaining_days'] = max(0, remaining_days)
+                        payment_dict['status'] = 'Pending' if remaining_days <= 0 else 'Paid'
+                        payments_list.append(payment_dict)
+            else:
+                # Add new member with pending status
+                payment_dict = {
+                    'date': datetime.now().strftime('%d-%m-%Y'),
+                    'member_id': str(member['member_id']),
+                    'member_name': member['name'],
+                    'package': member['package'],
+                    'amount': packages.get(member['package'], 0),
+                    'status': 'Pending',
+                    'remaining_days': 0
+                }
+                payments_list.append(payment_dict)
+
         return render_template('payments.html',
                              payments=payments_list,
-                             members=members_df.to_dict('records'),
                              packages=packages)
-                             
+
     except Exception as e:
-        app.logger.error(f"Error loading payments: {e}")
-        flash('Error loading payments')
+        app.logger.error(f"Error in payments route: {str(e)}")
+        flash('Error loading payments data')
         return redirect(url_for('staff_dashboard'))
+
+
+
 
 @app.route('/members/add', methods=['GET'])
 def add_member_page():
@@ -1694,116 +1701,6 @@ def change_password():
     return render_template('change_password.html')
 
 
-# #backup
-# def create_daily_backup():
-#     try:
-#         data_path = 'data'
-#         backup_file = os.path.join(data_path, 'gym_data_backup.xlsx')
-        
-#         # First load existing backup if it exists
-#         backup_data = {}
-#         if os.path.exists(backup_file):
-#             with pd.ExcelFile(backup_file) as xls:
-#                 for sheet_name in xls.sheet_names:
-#                     backup_data[sheet_name] = pd.read_excel(xls, sheet_name)
-
-#         with pd.ExcelWriter(backup_file, engine='openpyxl') as writer:
-#             # Members - Merge with existing backup
-#             current_members = pd.read_excel(os.path.join(data_path, 'members.xlsx'))
-#             if 'Members' in backup_data:
-#                 all_members = pd.concat([backup_data['Members'], current_members]).drop_duplicates(subset=['member_id'], keep='last')
-#             else:
-#                 all_members = current_members
-#             all_members.to_excel(writer, sheet_name='Members', index=False)
-
-#             # Staff - Merge with existing backup
-#             current_staff = pd.read_excel(os.path.join(data_path, 'receptionists.xlsx'))
-#             if 'Staff' in backup_data:
-#                 all_staff = pd.concat([backup_data['Staff'], current_staff]).drop_duplicates(subset=['username'], keep='last')
-#             else:
-#                 all_staff = current_staff
-#             all_staff.to_excel(writer, sheet_name='Staff', index=False)
-
-#             # Attendance - Append new records
-#             current_attendance = pd.read_excel(os.path.join(data_path, 'attendance.xlsx'))
-#             if 'Member Attendance' in backup_data:
-#                 all_attendance = pd.concat([backup_data['Member Attendance'], current_attendance]).drop_duplicates()
-#             else:
-#                 all_attendance = current_attendance
-#             all_attendance.to_excel(writer, sheet_name='Member Attendance', index=False)
-
-#             # Staff Attendance - Append new records
-#             current_staff_attendance = pd.read_excel(os.path.join(data_path, 'trainer_attendance.xlsx'))
-#             if 'Staff Attendance' in backup_data:
-#                 all_staff_attendance = pd.concat([backup_data['Staff Attendance'], current_staff_attendance]).drop_duplicates()
-#             else:
-#                 all_staff_attendance = current_staff_attendance
-#             all_staff_attendance.to_excel(writer, sheet_name='Staff Attendance', index=False)
-
-#             # Payments - Append new records
-#             current_payments = pd.read_excel(os.path.join(data_path, 'payments.xlsx'))
-#             if 'Payments' in backup_data:
-#                 all_payments = pd.concat([backup_data['Payments'], current_payments]).drop_duplicates()
-#             else:
-#                 all_payments = current_payments
-#             all_payments.to_excel(writer, sheet_name='Payments', index=False)
-
-#             # Inventory - Keep all items
-#             current_inventory = pd.read_excel(os.path.join(data_path, 'inventory.xlsx'))
-#             if 'Inventory' in backup_data:
-#                 all_inventory = pd.concat([backup_data['Inventory'], current_inventory]).drop_duplicates(subset=['id'], keep='last')
-#             else:
-#                 all_inventory = current_inventory
-#             all_inventory.to_excel(writer, sheet_name='Inventory', index=False)
-
-#             # Custom Products - Keep all products
-#             current_products = pd.read_excel(os.path.join(data_path, 'custom_products.xlsx'))
-#             if 'Custom Products' in backup_data:
-#                 all_products = pd.concat([backup_data['Custom Products'], current_products]).drop_duplicates(subset=['product_id'], keep='last')
-#             else:
-#                 all_products = current_products
-#             all_products.to_excel(writer, sheet_name='Custom Products', index=False)
-
-#             # Sales - Append new records
-#             current_sales = pd.read_excel(os.path.join(data_path, 'sales.xlsx'))
-#             if 'Sales' in backup_data:
-#                 all_sales = pd.concat([backup_data['Sales'], current_sales]).drop_duplicates()
-#             else:
-#                 all_sales = current_sales
-#             all_sales.to_excel(writer, sheet_name='Sales', index=False)
-
-#             # Packages - Keep all packages
-#             current_packages = pd.read_excel(os.path.join(data_path, 'packages.xlsx'))
-#             if 'Packages' in backup_data:
-#                 all_packages = pd.concat([backup_data['Packages'], current_packages]).drop_duplicates(subset=['name'], keep='last')
-#             else:
-#                 all_packages = current_packages
-#             all_packages.to_excel(writer, sheet_name='Packages', index=False)
-
-#         app.logger.info(f"Daily backup created successfully at {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}")
-#     except Exception as e:
-#         app.logger.error(f"Error creating daily backup: {str(e)}")
-
-# # Schedule the backup to run at midnight every day
-# def schedule_backup():
-#     while True:
-#         now = datetime.now()
-#         # Calculate time until next midnight
-#         next_run = (now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
-#         delay = (next_run - now).total_seconds()
-#         time.sleep(delay)
-#         create_daily_backup()
-
-
-# Thread(target=schedule_backup, daemon=True).start()
-
-
-
-# Remove the scheduling code and modify backup handling
-# Add this near the top of the file, after other imports
-from datetime import datetime, timedelta
-import pytz
-
 # Define timezone
 PKT = pytz.timezone('Asia/Karachi')  # UTC+05:00
 
@@ -1926,5 +1823,6 @@ def api_inventory():
     except Exception as e:
         app.logger.error(f"Error fetching inventory data: {e}")
         return json.dumps([])
+
 
 
