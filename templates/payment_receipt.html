@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-body p-5">
+            <div class="receipt-container">
+                <div class="text-center mb-5">
+                    <h2 class="fw-bold">Gym Management System</h2>
+                    <div class="border-bottom border-dark w-50 mx-auto my-3"></div>
+                    <h3 class="text-primary">Payment Receipt</h3>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-6">
+                        <h5 class="text-muted mb-3">Receipt Details</h5>
+                        <p class="mb-1"><strong>Date:</strong> {{ payment.date }}</p>
+                        <p class="mb-1"><strong>Receipt Status:</strong> 
+                            <span class="badge {% if payment.status == 'Paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                {{ payment.status }}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="col-6 text-end">
+                        <h5 class="text-muted mb-3">Member Information</h5>
+                        <p class="mb-1"><strong>ID:</strong> {{ payment.member_id }}</p>
+                        <p class="mb-1"><strong>Name:</strong> {{ payment.member_name }}</p>
+                    </div>
+                </div>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Description</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <strong>Package:</strong> {{ payment.package }}
+                                    {% if payment.package_discount > 0 %}
+                                    <br><small class="text-success">Discount: {{ payment.package_discount }}%</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">Rs. {{ payment.amount }}</td>
+                            </tr>
+                            {% if payment.additional_cost > 0 %}
+                            <tr>
+                                <td>
+                                    <strong>Additional Charges</strong>
+                                    {% if payment.additional_discount > 0 %}
+                                    <br><small class="text-success">Discount: {{ payment.additional_discount }}%</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">Rs. {{ payment.additional_cost }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr class="table-light">
+                                <td class="fw-bold">Total Amount</td>
+                                <td class="text-end fw-bold">Rs. {{ payment.amount }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if payment.comments %}
+                <div class="comments-section mb-4">
+                    <h6 class="text-muted">Comments:</h6>
+                    <p class="bg-light p-2 rounded">{{ payment.comments }}</p>
+                </div>
+                {% endif %}
+
+                <div class="text-center mt-5">
+                    <div class="border-top border-dark w-25 mx-auto mb-3"></div>
+                    <p class="text-muted">Thank you for your business!</p>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <button onclick="window.print()" class="btn btn-primary btn-lg">
+                    <i class="fas fa-print me-2"></i> Print Receipt
+                </button>
+                <a href="{{ url_for('payments') }}" class="btn btn-secondary btn-lg ms-2">
+                    <i class="fas fa-times me-2"></i> Close
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media print {
+        .btn { display: none; }
+        .card { 
+            border: none;
+            box-shadow: none !important;
+        }
+        .table { border: 1px solid #dee2e6; }
+        body { 
+            font-size: 12pt;
+            color: #000 !important;
+        }
+        .badge {
+            border: 1px solid #000;
+            color: #000 !important;
+            background-color: transparent !important;
+        }
+    }
+    .card {
+        border-radius: 10px;
+    }
+    .table th, .table td {
+        padding: 12px;
+    }
+    .badge {
+        font-size: 0.9em;
+        padding: 8px 12px;
+    }
+</style>
+{% endblock %}

@@ -7,7 +7,6 @@
     <!-- Payments History Table -->
     <div class="card mb-4">
         <div class="card-header">
-            <h4>Payments History</h4>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -41,6 +40,12 @@
                                 <span class="badge {% if payment.status == 'Paid' %}bg-success{% else %}bg-warning{% endif %}">
                                     {{ payment.status }}
                                 </span>
+                                <td>
+                                    <!-- Replace the existing receipt button with this -->
+                                    <a href="{{ url_for('payment_receipt', member_id=payment.member_id, date=payment.date) }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-receipt"></i> Receipt
+                                    </a>
+                                </td>
                             </td>
                         </tr>
                         {% endfor %}
@@ -80,53 +85,52 @@
                             </td>
                             <!-- In the Pending Payments section, update the form -->
                             <td>
-                                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#paymentModal{{ payment.member_id }}">
+                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#paymentModal{{ payment.member_id }}">
                                     Mark as Paid
                                 </button>
-                                
-                                <!-- Payment Modal -->
-                                <div class="modal fade" id="paymentModal{{ payment.member_id }}" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+                                <div class="modal fade" id="paymentModal{{ payment.member_id }}" tabindex="-1">
                                     <div class="modal-dialog">
                                         <div class="modal-content">
                                             <div class="modal-header">
-                                                <h5 class="modal-title" id="paymentModalLabel">Payment Details</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                <h5 class="modal-title">Payment Details - {{ payment.member_name }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                             </div>
                                             <form action="{{ url_for('mark_payment_as_paid') }}" method="POST">
                                                 <div class="modal-body">
                                                     <input type="hidden" name="member_id" value="{{ payment.member_id }}">
+                                                    <input type="hidden" name="package_amount" value="{{ packages[payment.package] }}">
                                                     
                                                     <div class="mb-3">
-                                                        <label for="packageAmount" class="form-label">Package Amount</label>
-                                                        <input type="text" class="form-control" id="packageAmount" value="Rs. {{ packages[payment.package] }}" readonly>
+                                                        <label class="form-label">Package Amount</label>
+                                                        <input type="text" class="form-control" value="Rs. {{ packages[payment.package] }}" readonly>
                                                     </div>
 
                                                     <div class="mb-3">
-                                                        <label for="additionalCost" class="form-label">Additional Cost</label>
-                                                        <input type="number" class="form-control" name="additional_cost" id="additionalCost{{ payment.member_id }}" 
-                                                               value="0" min="0" step="0.01" onchange="updateTotal('{{ payment.member_id }}', {{ packages[payment.package] }})">
+                                                        <label class="form-label">Package Discount (%)</label>
+                                                        <input type="number" class="form-control" name="package_discount" 
+                                                               value="0" min="0" max="100" step="1">
                                                     </div>
 
                                                     <div class="mb-3">
-                                                        <label for="discount" class="form-label">Discount (%)</label>
-                                                        <input type="number" class="form-control" name="discount" id="discount{{ payment.member_id }}" 
-                                                               value="0" min="0" max="100" step="1" onchange="updateTotal('{{ payment.member_id }}', {{ packages[payment.package] }})">
+                                                        <label class="form-label">Additional Cost</label>
+                                                        <input type="number" class="form-control" name="additional_cost" 
+                                                               value="0" min="0" step="0.01">
                                                     </div>
 
                                                     <div class="mb-3">
-                                                        <label for="comments" class="form-label">Comments</label>
-                                                        <textarea class="form-control" name="comments" id="comments" rows="3" placeholder="Enter any comments"></textarea>
+                                                        <label class="form-label">Additional Cost Discount (%)</label>
+                                                        <input type="number" class="form-control" name="additional_discount" 
+                                                               value="0" min="0" max="100" step="1">
                                                     </div>
 
                                                     <div class="mb-3">
-                                                        <label for="totalAmount" class="form-label">Total Amount</label>
-                                                        <input type="text" class="form-control" id="totalAmount{{ payment.member_id }}" 
-                                                               value="Rs. {{ packages[payment.package] }}" readonly>
+                                                        <label class="form-label">Comments</label>
+                                                        <textarea class="form-control" name="comments" rows="3"></textarea>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer">
                                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                                    <button type="submit" class="btn btn-success">Process Payment</button>
+                                                    <button type="submit" class="btn btn-primary">Mark as Paid</button>
                                                 </div>
                                             </form>
                                         </div>
@@ -151,6 +155,54 @@ function updateTotal(memberId, packageAmount) {
     const total = subtotal - discountAmount;
     
     document.getElementById('totalAmount' + memberId).value = 'Rs. ' + total.toFixed(2);
+}
+
+<!-- Add this modal at the end of the body -->
+<div class="modal fade" id="receiptModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Receipt</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="receiptContent">
+                <!-- Receipt content will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="printReceipt()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <button type="button" class="btn btn-primary" onclick="downloadReceipt()">
+                    <i class="fas fa-download"></i> Download PDF
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this JavaScript -->
+<script>
+function viewReceipt(memberId, date) {
+    fetch(`/payment/receipt/${memberId}/${date}`)
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('receiptContent').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('receiptModal')).show();
+        });
+}
+
+function printReceipt() {
+    const printWindow = window.open('', '', 'width=800,height=600');
+    printWindow.document.write(document.getElementById('receiptContent').innerHTML);
+    printWindow.document.close();
+    printWindow.print();
+}
+
+function downloadReceipt() {
+    const memberId = document.getElementById('receiptContent').getAttribute('data-member-id');
+    const date = document.getElementById('receiptContent').getAttribute('data-date');
+    window.location.href = `/payment/receipt/download/${memberId}/${date}`;
 }
 </script>
 {% endblock %}

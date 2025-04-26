@@ -747,6 +747,74 @@ def payments():
         return redirect(url_for('staff_dashboard'))
 
 
+@app.route('/payment/receipt/<member_id>/<date>')
+def payment_receipt(member_id, date):
+    if 'user_type' not in session:
+        return redirect(url_for('login'))
+        
+    try:
+        payments_df = pd.read_excel('data/payments.xlsx')
+        
+        # Find the specific payment
+        payment = payments_df[
+            (payments_df['member_id'].astype(str) == str(member_id)) & 
+            (payments_df['date'] == date)
+        ].iloc[0]
+        
+        return render_template('payment_receipt.html',
+                             payment=payment.to_dict(),
+                             date=date)
+    except Exception as e:
+        app.logger.error(f"Error generating receipt: {str(e)}")
+        flash('Error generating receipt')
+        return redirect(url_for('payments'))
+
+@app.route('/payment/receipt/download/<member_id>/<date>')
+def download_payment_receipt(member_id, date):
+    try:
+        payments_df = pd.read_excel('data/payments.xlsx')
+        members_df = pd.read_excel('data/members.xlsx')
+        
+        # Find the specific payment
+        payment = payments_df[
+            (payments_df['member_id'].astype(str) == str(member_id)) & 
+            (payments_df['date'] == date)
+        ].iloc[0]
+        
+        # Get member details
+        member = members_df[members_df['member_id'].astype(str) == str(member_id)].iloc[0]
+        
+        # Create PDF
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer)
+        
+        # Add receipt content
+        p.drawString(100, 800, "Gym Management System - Payment Receipt")
+        p.drawString(100, 780, f"Date: {payment['date']}")
+        p.drawString(100, 760, f"Member ID: {member_id}")
+        p.drawString(100, 740, f"Member Name: {payment['member_name']}")
+        p.drawString(100, 720, f"Package: {payment['package']}")
+        p.drawString(100, 700, f"Package Amount: Rs. {payment['amount']}")
+        p.drawString(100, 680, f"Package Discount: {payment['package_discount']}%")
+        p.drawString(100, 660, f"Additional Cost: Rs. {payment['additional_cost']}")
+        p.drawString(100, 640, f"Additional Discount: {payment['additional_discount']}%")
+        p.drawString(100, 620, f"Total Amount: Rs. {payment['amount']}")
+        p.drawString(100, 600, f"Status: {payment['status']}")
+        p.drawString(100, 580, f"Comments: {payment['comments']}")
+        
+        p.save()
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'payment_receipt_{member_id}_{date}.pdf'
+        )
+    except Exception as e:
+        app.logger.error(f"Error downloading receipt: {str(e)}")
+        flash('Error downloading receipt')
+        return redirect(url_for('payments'))
 
 
 @app.route('/members/add', methods=['GET'])
@@ -767,32 +835,43 @@ def add_member_page():
 @app.route('/members/add', methods=['POST'])
 def add_member():
     try:
+        # Validate required fields
+        required_fields = ['name', 'phone', 'address', 'dob', 'join_date', 'package']
+        for field in required_fields:
+            if not request.form.get(field):
+                flash(f'{field.replace("_", " ").title()} is required')
+                return redirect(url_for('add_member_page'))
+
         members_df = pd.read_excel('data/members.xlsx')
         
         # Generate unique member ID
         if members_df.empty or 'member_id' not in members_df.columns:
             next_id = 1001
         else:
-            # Convert member_id to numeric, handling any non-numeric values
             valid_ids = pd.to_numeric(members_df['member_id'], errors='coerce')
             next_id = int(valid_ids.max() + 1) if not valid_ids.empty else 1001
         
+        # Get join date from form or use current date as fallback
+        join_date = request.form.get('join_date')
+        if join_date:
+            join_date = datetime.strptime(join_date, '%Y-%m-%d').strftime('%d-%m-%Y')
+        
         new_member = {
-            'member_id': next_id,  # Ensure member_id is included
+            'member_id': next_id,
             'name': request.form.get('name'),
             'phone': request.form.get('phone'),
-            'gender': request.form.get('gender'),
+            'gender': request.form.get('gender', ''),  # Optional
             'dob': request.form.get('dob'),
             'address': request.form.get('address'),
             'package': request.form.get('package'),
-            'join_date': datetime.now().strftime('%d-%m-%Y'),
-            'next_of_kin_name': request.form.get('kin_name'),
-            'next_of_kin_phone': request.form.get('kin_phone'),
-            'medical_conditions': request.form.get('medical_conditions'),
-            'weight': request.form.get('weight'),
-            'height': request.form.get('height'),
+            'join_date': join_date,
+            'next_of_kin_name': request.form.get('kin_name', ''),  # Optional
+            'next_of_kin_phone': request.form.get('kin_phone', ''),  # Optional
+            'medical_conditions': request.form.get('medical_conditions', ''),  # Optional
+            'weight': request.form.get('weight', ''),  # Optional
+            'height': request.form.get('height', ''),  # Optional
             'status': 'Active',
-            'payment_status': 'Pending'  # Added payment status
+            'payment_status': 'Pending'
         }
         
         # Create DataFrame with single row and concat
@@ -890,37 +969,46 @@ def add_custom_product():
 @app.route('/mark_payment_as_paid', methods=['POST'])
 def mark_payment_as_paid():
     try:
+        # Get form data
         member_id = request.form.get('member_id')
+        package_amount = float(request.form.get('package_amount', 0))
+        package_discount = float(request.form.get('package_discount', 0))
         additional_cost = float(request.form.get('additional_cost', 0))
-        discount_percent = float(request.form.get('discount', 0))
+        additional_discount = float(request.form.get('additional_discount', 0))
         comments = request.form.get('comments', '')
-        
-        # Load data
+
+        # Calculate package amount after discount
+        package_discount_amount = (package_amount * package_discount) / 100
+        final_package_amount = package_amount - package_discount_amount
+
+        # Calculate additional cost after its discount separately
+        additional_discount_amount = (additional_cost * additional_discount) / 100
+        final_additional_cost = additional_cost - additional_discount_amount
+
+        # Total amount is sum of discounted package and discounted additional cost
+        total_amount = final_package_amount + final_additional_cost
+
+        # Load payments and members data
         payments_df = pd.read_excel('data/payments.xlsx')
-        packages_df = pd.read_excel('data/packages.xlsx')
         members_df = pd.read_excel('data/members.xlsx')
         
-        # Get member's package info
-        member = members_df[members_df['member_id'].astype(str) == str(member_id)].iloc[0]
-        package_info = packages_df[packages_df['name'] == member['package']].iloc[0]
-        package_price = float(package_info['price'])
-        
-        # Calculate total amount with discount
-        subtotal = package_price + additional_cost
-        discount_amount = (subtotal * discount_percent) / 100
-        total_amount = subtotal - discount_amount
+        # Convert member_id to string for comparison
+        members_df['member_id'] = members_df['member_id'].astype(str)
+        member_data = members_df[members_df['member_id'] == str(member_id)].iloc[0]
         
         # Create new payment record
         new_payment = {
             'member_id': member_id,
-            'member_name': member['name'],
-            'package': member['package'],
-            'amount': total_amount,
-            'additional_cost': additional_cost,
-            'discount': discount_percent,
+            'member_name': member_data['name'],
+            'package': member_data['package'],
+            'amount': total_amount,  # Store total amount including both discounts
+            'additional_cost': final_additional_cost,
+            'package_discount': package_discount,
+            'additional_discount': additional_discount,
+            'date': datetime.now().strftime('%d-%m-%Y'),
             'comments': comments,
-            'date': datetime.now(PKT).strftime('%d-%m-%Y'),
-            'status': 'Paid'
+            'status': 'Paid',
+            'remaining_days': 30  # or calculate based on package duration
         }
         
         # Add new payment record
