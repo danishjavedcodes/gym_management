@@ -10,6 +10,7 @@
             <h4>Payments History</h4>
         </div>
         <div class="card-body">
+            <!-- In the Payments History Table, add the comments column -->
             <table class="table table-striped">
                 <thead>
                     <tr>
@@ -18,8 +19,10 @@
                         <th>Member Name</th>
                         <th>Package</th>
                         <th>Amount</th>
+                        <th>Additional Cost</th>
+                        <th>Comments</th>
                         <th>Status</th>
-                        <th>Remaining Days</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -30,6 +33,8 @@
                         <td>{{ payment.member_name }}</td>
                         <td>{{ payment.package }}</td>
                         <td>Rs. {{ payment.amount }}</td>
+                        <td>Rs. {{ payment.additional_cost or 0 }}</td>
+                        <td>{{ payment.comments or '' }}</td>
                         <td>
                             <span class="badge {% if payment.status == 'Paid' %}bg-success{% else %}bg-warning{% endif %}">
                                 {{ payment.status }}
@@ -71,11 +76,54 @@
                             <td>
                                 <span class="badge bg-warning">{{ payment.status }}</span>
                             </td>
+                            <!-- In the Pending Payments section, update the form -->
                             <td>
-                                <form action="{{ url_for('mark_payment_as_paid') }}" method="POST">
-                                    <input type="hidden" name="member_id" value="{{ payment.member_id }}">
-                                    <button type="submit" class="btn btn-success btn-sm">Mark as Paid</button>
-                                </form>
+                                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#paymentModal{{ payment.member_id }}">
+                                    Mark as Paid
+                                </button>
+                                
+                                <!-- Payment Modal -->
+                                <div class="modal fade" id="paymentModal{{ payment.member_id }}" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="paymentModalLabel">Payment Details</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <form action="{{ url_for('mark_payment_as_paid') }}" method="POST">
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="member_id" value="{{ payment.member_id }}">
+                                                    
+                                                    <div class="mb-3">
+                                                        <label for="packageAmount" class="form-label">Package Amount</label>
+                                                        <input type="text" class="form-control" id="packageAmount" value="Rs. {{ packages[payment.package] }}" readonly>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label for="additionalCost" class="form-label">Additional Cost</label>
+                                                        <input type="number" class="form-control" name="additional_cost" id="additionalCost{{ payment.member_id }}" 
+                                                               value="0" min="0" step="0.01" onchange="updateTotal('{{ payment.member_id }}', {{ packages[payment.package] }})">
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label for="comments" class="form-label">Comments</label>
+                                                        <textarea class="form-control" name="comments" id="comments" rows="3" placeholder="Enter any comments"></textarea>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label for="totalAmount" class="form-label">Total Amount</label>
+                                                        <input type="text" class="form-control" id="totalAmount{{ payment.member_id }}" 
+                                                               value="Rs. {{ packages[payment.package] }}" readonly>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                    <button type="submit" class="btn btn-success">Process Payment</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         {% endif %}
@@ -85,4 +133,11 @@
         </div>
     </div>
 </div>
+<script>
+function updateTotal(memberId, packageAmount) {
+    const additionalCost = parseFloat(document.getElementById('additionalCost' + memberId).value) || 0;
+    const total = packageAmount + additionalCost;
+    document.getElementById('totalAmount' + memberId).value = 'Rs. ' + total;
+}
+</script>
 {% endblock %}

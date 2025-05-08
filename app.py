@@ -68,8 +68,14 @@ def init_excel_files():
             'check_in': [], 'check_out': []
         },
         'payments.xlsx': {
-            'date': [], 'member_id': [], 'member_name': [], 
-            'package': [], 'amount': [], 'status': []
+            'date': [], 
+            'member_id': [], 
+            'member_name': [], 
+            'package': [], 
+            'amount': [], 
+            'additional_cost': [],  # New column
+            'comments': [],         # New column
+            'status': []
         },
         'receptionists.xlsx': {
             'username': [], 'password': [], 'name': [], 'phone': [], 
@@ -802,45 +808,6 @@ def add_member():
 
 
 
-# @app.route('/payments/add', methods=['POST'])
-# def add_payment():
-#     if 'user_type' not in session:
-#         return redirect(url_for('login'))
-    
-#     try:
-#         payments_df = pd.read_excel('data/payments.xlsx')
-#         members_df = pd.read_excel('data/members.xlsx')
-        
-#         member_id = request.form.get('member_id')
-#         member = members_df[members_df['id'].astype(str) == str(member_id)].iloc[0]
-        
-#         new_payment = {
-#             'date': datetime.now().strftime('%d-%m-%Y'),
-#             'member_id': member_id,
-#             'member_name': member['name'],
-#             'package': member['package'],
-#             'amount': float(request.form.get('amount')),
-#             'status': 'Paid'
-#         }
-        
-#         payments_df = pd.concat([payments_df, pd.DataFrame([new_payment])], ignore_index=True)
-#         payments_df.to_excel('data/payments.xlsx', index=False)
-        
-#         # Update member payment status
-#         members_df.loc[members_df['id'].astype(str) == str(member_id), 'payment_status'] = 'Paid'
-#         members_df.to_excel('data/members.xlsx', index=False)
-        
-#         flash('Payment recorded successfully')
-#     except Exception as e:
-#         app.logger.error(f"Error recording payment: {e}")
-#         flash('Error recording payment')
-    
-#     return redirect(url_for('payments'))
-
-
-
-
-
 @app.route('/custom_product', methods=['GET'])
 def custom_product_page():
     if 'user_type' not in session:
@@ -919,12 +886,6 @@ def add_custom_product():
         return redirect(url_for('custom_product_page'))
 
 
-
-
-
-
-
-
 @app.route('/payments/mark_as_paid', methods=['POST'])
 def mark_payment_as_paid():
     if 'user_type' not in session:
@@ -932,50 +893,24 @@ def mark_payment_as_paid():
     
     try:
         # Initialize DataFrames
-        if not os.path.exists('data/payments.xlsx'):
-            pd.DataFrame(columns=['date', 'member_id', 'member_name', 'package', 'amount', 'status']).to_excel('data/payments.xlsx', index=False)
-        
         payments_df = pd.read_excel('data/payments.xlsx')
         members_df = pd.read_excel('data/members.xlsx')
         packages_df = pd.read_excel('data/packages.xlsx')
         
-        # Get member_id from form and log it for debugging
         member_id = request.form.get('member_id')
-        app.logger.info(f"Received member_id from form: {member_id}")
+        additional_cost = float(request.form.get('additional_cost', 0))
+        comments = request.form.get('comments', '')
         
-        if not member_id:
-            app.logger.error("No member_id received from form")
-            flash("Member ID is required")
-            return redirect(url_for('payments'))
-        
-        # Convert member_id to string for comparison
-        member_id_str = str(member_id)
-        
-        # Debug: Print all member IDs in the dataframe
-        app.logger.info(f"All member IDs in database: {members_df['member_id'].tolist()}")
-        
-        # Convert all member_id values to string for comparison
-        members_df['member_id'] = members_df['member_id'].astype(str)
-        
-        # Find the member
-        member_rows = members_df[members_df['member_id'] == member_id_str]
-        
-        if member_rows.empty:
-            app.logger.error(f"Member with ID {member_id} not found in database")
-            flash(f"Member with ID {member_id} not found")
-            return redirect(url_for('payments'))
-            
-        member = member_rows.iloc[0]
+        # Get member details
+        member = members_df[members_df['member_id'].astype(str) == str(member_id)].iloc[0]
+        member_id_str = str(member['member_id'])
         package_name = member['package']
         
         # Get package price
-        package_row = packages_df[packages_df['name'] == package_name]
-        if package_row.empty:
-            app.logger.error(f"Package {package_name} not found")
-            flash(f"Package {package_name} not found")
-            return redirect(url_for('payments'))
-            
-        package_price = package_row['price'].iloc[0]
+        package_price = float(packages_df[packages_df['name'] == package_name]['price'].iloc[0])
+        
+        # Calculate total amount
+        total_amount = package_price + additional_cost
         
         # Create new payment record
         payment_date = datetime.now().strftime('%d-%m-%Y')
@@ -984,7 +919,9 @@ def mark_payment_as_paid():
             'member_id': member_id_str,
             'member_name': member['name'],
             'package': package_name,
-            'amount': float(package_price),
+            'amount': total_amount,
+            'additional_cost': additional_cost,
+            'comments': comments,
             'status': 'Paid'
         }
         
@@ -993,10 +930,9 @@ def mark_payment_as_paid():
         payments_df.to_excel('data/payments.xlsx', index=False)
         
         # Update member payment status
-        members_df.loc[members_df['member_id'] == member_id_str, 'payment_status'] = 'Paid'
+        members_df.loc[members_df['member_id'].astype(str) == member_id_str, 'payment_status'] = 'Paid'
         members_df.to_excel('data/members.xlsx', index=False)
         
-        app.logger.info(f"Payment recorded successfully for member {member_id_str}")
         flash('Payment recorded successfully')
         
     except Exception as e:
@@ -1004,7 +940,6 @@ def mark_payment_as_paid():
         flash(f'Error recording payment: {str(e)}')
     
     return redirect(url_for('payments'))
-
 
 
 
@@ -1823,6 +1758,7 @@ def api_inventory():
     except Exception as e:
         app.logger.error(f"Error fetching inventory data: {e}")
         return json.dumps([])
+
 
 
 
