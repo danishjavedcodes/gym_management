@@ -6,13 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "gym-management"
 version = "1.0.0"
 description = "Gym Management System"
-requires-python = ">=3.12"  # Updated to match Python 3.12
+requires-python = ">=3.12"
 dependencies = [
     "Flask==2.3.3",
     "pandas==2.2.1",
     "openpyxl==3.1.2",
     "gunicorn==21.2.0",
     "pytz==2024.1",
-    "numpy==1.26.4",
-    # Add other dependencies as needed
+    "numpy==1.26.4"
 ]
