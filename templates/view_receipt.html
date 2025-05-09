@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    {% if receipt %}
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h3 class="card-title mb-0">Sale Receipt #{{ receipt.id }}</h3>
+            <div>
+                <form action="{{ url_for('print_receipt') }}" method="POST" class="d-inline">
+                    <input type="hidden" name="receipt_id" value="{{ receipt.id }}">
+                    <button type="submit" class="btn btn-light">Print Receipt</button>
+                </form>
+                <form action="{{ url_for('download_receipt') }}" method="POST" class="d-inline">
+                    <input type="hidden" name="receipt_id" value="{{ receipt.id }}">
+                    <button type="submit" class="btn btn-light">Download Receipt</button>
+                </form>
+                <a href="{{ url_for('sales') }}" class="btn btn-light">Back to Sales</a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="receipt-content">
+                <!-- Receipt Header -->
+                <div class="text-center mb-4">
+                    <h4>Fitness Base</h4>
+                    <p>Receipt #{{ receipt.id }}</p>
+                    <p>Date: {{ receipt.date.split(' ')[0] if ' ' in receipt.date else receipt.date }}</p>
+                    <p>Staff: {{ receipt.staff_name }}</p>
+                </div>
+
+                <!-- Items Table -->
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if receipt.items %}
+                            {% for item in receipt.items %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>Rs. {{ "%.2f"|format(item.price|float) }}</td>
+                                <td>Rs. {{ "%.2f"|format(item.total|float) }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% endif %}
+                        <tr class="table-info">
+                            <td colspan="3" class="text-end"><strong>Grand Total:</strong></td>
+                            <td><strong>Rs. {{ "%.2f"|format(receipt.total_amount|float) }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Payment Method -->
+                <div class="mt-3">
+                    <p><strong>Payment Method:</strong> {{ receipt.payment_method|default('Cash')|title }}</p>
+                </div>
+
+                <!-- Receipt Footer -->
+                <div class="text-center mt-4">
+                    <p>Thank you for your purchase!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        <p>Receipt not found. <a href="{{ url_for('sales') }}" class="alert-link">Return to Sales</a></p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    @media print {
+        .btn, form { display: none; }
+        .container { width: 100%; max-width: none; }
+        .receipt-content { padding: 20px; }
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,320 @@
+-- 3) Inventory Items
+-- ==================================
+CREATE TABLE inventory_items (
+    item_id             SERIAL PRIMARY KEY,
+    item_name           VARCHAR(100) NOT NULL,
+    number_of_servings  INT NOT NULL,
+    cost_per_serving    NUMERIC(10, 2),
+    remaining_servings  INT NOT NULL,
+    other_charges       NUMERIC(10, 2),
+    date_added          DATE NOT NULL DEFAULT CURRENT_DATE
+);
+
+
+CREATE TABLE products (
+    product_id   SERIAL PRIMARY KEY,
+    product_name VARCHAR(100) NOT NULL,
+    price        NUMERIC(10, 2) NOT NULL,
+    description  TEXT
+);
+
+CREATE TABLE product_items (
+    product_id    INT NOT NULL REFERENCES products(product_id)
+        ON DELETE CASCADE,
+    item_id       INT NOT NULL REFERENCES inventory_items(item_id)
+        ON DELETE CASCADE,
+    servings_used INT NOT NULL,
+    PRIMARY KEY (product_id, item_id)
+);
+
+
+CREATE TABLE sale_details (
+    sale_detail_id   SERIAL PRIMARY KEY,
+    sale_id          INT NOT NULL REFERENCES sales(sale_id)
+        ON DELETE CASCADE,
+    item_type        VARCHAR(10) NOT NULL 
+        CHECK (item_type IN ('product', 'item')),
+    product_id       INT REFERENCES products(product_id),
+    item_id          INT REFERENCES inventory_items(item_id),
+    quantity         INT NOT NULL,
+    price            NUMERIC(10, 2) NOT NULL
+);
+
+
+-- Add the constraint after table creation
+ALTER TABLE sale_details DROP CONSTRAINT IF EXISTS sale_details_check;
+
+ALTER TABLE sale_details ADD CONSTRAINT sale_details_check
+    CHECK (
+        (item_type = 'product' AND (product_id IS NOT NULL OR product_id IS NULL) AND item_id IS NULL)
+        OR
+        (item_type = 'item' AND item_id IS NOT NULL AND product_id IS NULL)
+    );
+);
+
+
+-- Add function to check if product can be sold based on inventory
+CREATE OR REPLACE FUNCTION fn_check_product_availability(
+    p_product_id INT,
+    p_quantity INT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_available BOOLEAN := TRUE;
+BEGIN
+    SELECT BOOL_AND(i.remaining_servings >= (pi.servings_used * p_quantity))
+    INTO v_available
+    FROM product_items pi
+    JOIN inventory_items i ON pi.item_id = i.item_id
+    WHERE pi.product_id = p_product_id;
+    
+    RETURN COALESCE(v_available, FALSE);
+END;
+$$;/
+
+
+CREATE OR REPLACE PROCEDURE sp_add_item(
+    p_item_name VARCHAR(100),
+    p_number_of_servings INT,
+    p_cost_per_serving NUMERIC(10, 2),
+    p_remaining_servings INT,
+    p_other_charges NUMERIC(10, 2)
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_item_id INT;
+BEGIN
+    INSERT INTO inventory_items (
+        item_name,
+        number_of_servings,
+        cost_per_serving,
+        remaining_servings,
+        other_charges,
+        date_added
+    )
+    VALUES (
+        p_item_name,
+        p_number_of_servings,
+        p_cost_per_serving,
+        p_remaining_servings,
+        p_other_charges,
+        CURRENT_DATE
+    )
+    RETURNING item_id INTO v_item_id;
+END;
+$$;
+
+
+-- Add procedure to update item servings
+CREATE OR REPLACE PROCEDURE sp_update_item_servings(
+    p_item_id INT,
+    p_servings_change INT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_remaining INT;
+BEGIN
+    SELECT remaining_servings INTO v_remaining
+    FROM inventory_items
+    WHERE item_id = p_item_id;
+    
+    IF v_remaining + p_servings_change < 0 THEN
+        RAISE EXCEPTION 'Not enough servings available for item ID %', p_item_id;
+    END IF;
+    
+    UPDATE inventory_items
+    SET remaining_servings = remaining_servings + p_servings_change
+    WHERE item_id = p_item_id;
+END;
+$$;
+
+
+-- Add function to get product inventory status
+CREATE OR REPLACE FUNCTION fn_get_product_inventory_status()
+RETURNS TABLE (
+    product_id INT,
+    product_name VARCHAR(100),
+    can_be_sold BOOLEAN,
+    inventory_status JSON
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.product_id,
+        p.product_name,
+        fn_check_product_availability(p.product_id, 1) as can_be_sold,
+        COALESCE(
+            json_agg(
+                json_build_object(
+                    'item_name', i.item_name,
+                    'servings_needed', pi.servings_used,
+                    'servings_available', i.remaining_servings,
+                    'is_available', i.remaining_servings >= pi.servings_used
+                )
+            ) FILTER (WHERE i.item_id IS NOT NULL),
+            '[]'::json
+        ) as inventory_status
+    FROM products p
+    LEFT JOIN product_items pi ON p.product_id = pi.product_id
+    LEFT JOIN inventory_items i ON pi.item_id = i.item_id
+    GROUP BY p.product_id, p.product_name
+    ORDER BY p.product_id;
+END;
+$$;
+
+
+-- A composite type used as a function parameter/array element.
+CREATE TYPE sale_line AS (
+    item_type TEXT,          -- 'item' or 'product'
+    product_id INT,
+    item_id INT,
+    quantity INT,
+    unit_price NUMERIC(10, 2)
+);
+
+CREATE OR REPLACE FUNCTION sp_record_sale(
+    p_payment_method TEXT,
+    p_received_by_staff_id INT,
+    p_lines sale_line[]   -- Array of 'sale_line' composite type
+)
+RETURNS INT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_sale_id INT;
+    v_total_amount NUMERIC(10, 2) := 0;
+    v_line sale_line;
+    v_item_id INT;
+    v_servings_used INT;
+    v_items_sold JSONB := '[]'::jsonb;  -- Ensure this is JSONB
+BEGIN
+    -- 1) Sum the total amount from all line items
+    FOREACH v_line IN ARRAY p_lines
+    LOOP
+        v_total_amount := v_total_amount + (v_line.unit_price * v_line.quantity);
+        
+        -- Add item details to items_sold JSON
+        v_items_sold := jsonb_set(
+            v_items_sold,
+            '{items}',  -- Correctly specify the path as an array of text
+            COALESCE(
+                jsonb_agg(
+                    jsonb_build_object(
+                        'item_type', v_line.item_type,
+                        'product_id', v_line.product_id,
+                        'item_id', v_line.item_id,
+                        'quantity', v_line.quantity,
+                        'unit_price', v_line.unit_price
+                    )
+                ) FILTER (WHERE v_line.item_id IS NOT NULL OR v_line.product_id IS NOT NULL),
+                '[]'::jsonb
+            ),
+            true  -- Ensure create_missing is set to true
+        );
+    END LOOP;
+
+    -- 2) Insert into 'sales' table (the "header" of the sale)
+    INSERT INTO sales (
+        sale_timestamp,
+        total_amount,
+        payment_method,
+        received_by_staff_id,
+        items_sold
+    )
+    VALUES (
+        NOW(),
+        v_total_amount,
+        p_payment_method,
+        p_received_by_staff_id,
+        v_items_sold
+    )
+    RETURNING sale_id INTO v_sale_id;
+
+    -- 3) For each line item in the array, insert into 'sale_details' and reduce inventory
+    FOREACH v_line IN ARRAY p_lines
+    LOOP
+        -- 3a) Insert the line item into 'sale_details'
+        INSERT INTO sale_details (
+            sale_id,
+            item_type,
+            product_id,
+            item_id,
+            quantity,
+            price
+        )
+        VALUES (
+            v_sale_id,
+            v_line.item_type,
+            v_line.product_id,
+            v_line.item_id,
+            v_line.quantity,
+            v_line.unit_price
+        );
+
+        -- 3b) Reduce inventory
+        IF v_line.item_type = 'item' THEN
+            -- Directly decrement the 'remaining_servings' in 'inventory_items'
+            UPDATE inventory_items
+               SET remaining_servings = remaining_servings - v_line.quantity
+             WHERE item_id = v_line.item_id;
+
+        ELSIF v_line.item_type = 'product' THEN
+            -- For each item in 'product_items', reduce inventory by (servings_used * quantity)
+            FOR v_item_id, v_servings_used IN
+                SELECT item_id, servings_used
+                  FROM product_items
+                 WHERE product_id = v_line.product_id
+            LOOP
+                UPDATE inventory_items
+                   SET remaining_servings = remaining_servings - (v_servings_used * v_line.quantity)
+                 WHERE item_id = v_item_id;
+            END LOOP;
+        END IF;
+    END LOOP;
+
+    -- Return the newly created 'sale_id' in case the application needs it
+    RETURN v_sale_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION fn_get_all_sales()
+RETURNS TABLE (
+    sale_id INT,
+    sale_date TIMESTAMP,
+    items_list TEXT,
+    total_amount NUMERIC(10,2),
+    payment_method TEXT,
+    staff_name VARCHAR(100)
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        s.sale_id,
+        s.sale_timestamp,
+        string_agg(
+            CASE 
+                WHEN (item->>'item_type')::TEXT = 'item' THEN 
+                    (item->>'name')::TEXT
+                ELSE 
+                    (item->>'name')::TEXT
+            END,
+            ', '
+        ) as items_list,
+        s.total_amount,
+        s.payment_method,
+        st.full_name as staff_name
+    FROM sales s
+    CROSS JOIN LATERAL jsonb_array_elements(s.items_sold) as item
+    JOIN staff st ON s.received_by_staff_id = st.staff_id
+    GROUP BY s.sale_id, s.sale_timestamp, s.total_amount, s.payment_method, st.full_name
+    ORDER BY s.sale_timestamp DESC;
+END;
+$$;

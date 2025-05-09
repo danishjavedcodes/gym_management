@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Edit Package: {{ package.name }}</h2>
+    
+    <div class="card">
+        <div class="card-body">
+            <form action="{{ url_for('edit_package', name=package.name) }}" method="POST">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Package Name</label>
+                        <input type="text" value="{{ package.name }}" class="form-control" readonly>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Price (Rs. )</label>
+                        <input type="number" name="price" value="{{ package.price }}" class="form-control" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Duration (months)</label>
+                        <input type="number" name="duration" value="{{ package.duration }}" class="form-control" required>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Trainers</label>
+                        <select name="trainers" class="form-control" required>
+                            <option value="No Trainer" {% if package.trainers == 'No Trainer' %}selected{% endif %}>No Trainer</option>
+                            <option value="Personal Trainer" {% if package.trainers == 'Personal Trainer' %}selected{% endif %}>Personal Trainer</option>
+                            <option value="Group Training" {% if package.trainers == 'Group Training' %}selected{% endif %}>Group Training</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Cardio Access</label>
+                        <select name="cardio_access" class="form-control" required>
+                            <option value="Yes" {% if package.cardio_access == 'Yes' %}selected{% endif %}>Yes</option>
+                            <option value="No" {% if package.cardio_access == 'No' %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Sauna Access</label>
+                        <select name="sauna_access" class="form-control" required>
+                            <option value="No" {% if package.sauna_access == 'No' %}selected{% endif %}>No Access</option>
+                            <option value="1 day/week" {% if package.sauna_access == '1 day/week' %}selected{% endif %}>1 day per week</option>
+                            <option value="2 days/week" {% if package.sauna_access == '2 days/week' %}selected{% endif %}>2 days per week</option>
+                            <option value="3 days/week" {% if package.sauna_access == '3 days/week' %}selected{% endif %}>3 days per week</option>
+                            <option value="4 days/week" {% if package.sauna_access == '4 days/week' %}selected{% endif %}>4 days per week</option>
+                            <option value="5 days/week" {% if package.sauna_access == '5 days/week' %}selected{% endif %}>5 days per week</option>
+                            <option value="6 days/week" {% if package.sauna_access == '6 days/week' %}selected{% endif %}>6 days per week</option>
+                            <option value="7 days/week" {% if package.sauna_access == '7 days/week' %}selected{% endif %}>7 days per week</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Steam Room Access</label>
+                        <select name="steam_room" class="form-control" required>
+                            <option value="No" {% if package.steam_room == 'No' %}selected{% endif %}>No Access</option>
+                            <option value="1 day/week" {% if package.steam_room == '1 day/week' %}selected{% endif %}>1 day per week</option>
+                            <option value="2 days/week" {% if package.steam_room == '2 days/week' %}selected{% endif %}>2 days per week</option>
+                            <option value="3 days/week" {% if package.steam_room == '3 days/week' %}selected{% endif %}>3 days per week</option>
+                            <option value="4 days/week" {% if package.steam_room == '4 days/week' %}selected{% endif %}>4 days per week</option>
+                            <option value="5 days/week" {% if package.steam_room == '5 days/week' %}selected{% endif %}>5 days per week</option>
+                            <option value="6 days/week" {% if package.steam_room == '6 days/week' %}selected{% endif %}>6 days per week</option>
+                            <option value="7 days/week" {% if package.steam_room == '7 days/week' %}selected{% endif %}>7 days per week</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label">Timings</label>
+                        <select name="timings" class="form-control" required>
+                            <option value="Morning (6 AM - 11 AM)" {% if package.timings == 'Morning (6 AM - 11 AM)' %}selected{% endif %}>Morning (6 AM - 11 AM)</option>
+                            <option value="Evening (4 PM - 9 PM)" {% if package.timings == 'Evening (4 PM - 9 PM)' %}selected{% endif %}>Evening (4 PM - 9 PM)</option>
+                            <option value="All Day Access" {% if package.timings == 'All Day Access' %}selected{% endif %}>All Day Access</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Update Package</button>
+                    <a href="{{ url_for('packages') }}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,36 @@
+<!-- Modal content only, NO extends or block tags -->
+<div class="modal fade" id="addStaffModal" tabindex="-1" aria-labelledby="addStaffModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addStaffModalLabel">Add New Staff Member</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('add_receptionist') }}" method="POST">
+                <div class="modal-body">
+                    <!-- Form fields -->
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="contact" class="form-label">Contact</label>
+                        <input type="text" class="form-control" id="contact" name="contact" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Add Staff</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

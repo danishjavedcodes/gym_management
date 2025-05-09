@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Custom Product{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Create Custom Product</h2>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Available Ingredients</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Price</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in inventory %}
+                                <tr>
+                                    <td>{{ item.stock_type }}</td>
+                                    <td>{{ (item.cost_per_serving|float + item.profit_per_serving|float)|round(2) }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary add-ingredient" 
+                                                data-id="{{ item.id }}" 
+                                                data-name="{{ item.stock_type }}" 
+                                                data-price="{{ (item.cost_per_serving|float + item.profit_per_serving|float)|round(2) }}">
+                                            Add
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Custom Product Details</h5>
+                </div>
+                <div class="card-body">
+                    <form id="customProductForm" action="{{ url_for('add_custom_product') }}" method="POST">
+                        <div class="mb-3">
+                            <label for="product_name" class="form-label">Product Name</label>
+                            <input type="text" class="form-control" id="product_name" name="product_name" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Selected Ingredients</label>
+                            <div id="selectedIngredients" class="list-group mb-3">
+                                <!-- Selected ingredients will be added here dynamically -->
+                                <div class="list-group-item text-center text-muted" id="noIngredientsMsg">
+                                    No ingredients selected
+                                </div>
+                            </div>
+                            <input type="hidden" id="ingredients_json" name="ingredients_json" value="[]">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="total_cost" class="form-label">Total Cost</label>
+                            <input type="text" class="form-control" id="total_cost" readonly value="0.00">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="final_price" class="form-label">Final Price</label>
+                            <input type="number" step="0.01" class="form-control" id="final_price" name="final_price" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="profit" class="form-label">Profit</label>
+                            <input type="text" class="form-control" id="profit" readonly value="0.00">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success">Save Custom Product</button>
+                        <a href="{{ url_for('sales') }}" class="btn btn-secondary">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const ingredients = [];
+        
+        // Add ingredient to the list
+        document.querySelectorAll('.add-ingredient').forEach(button => {
+            button.addEventListener('click', function() {
+                const id = this.getAttribute('data-id');
+                const name = this.getAttribute('data-name');
+                const price = parseFloat(this.getAttribute('data-price'));
+                
+                // Check if already in list
+                const existingIndex = ingredients.findIndex(ing => ing.id === id);
+                
+                if (existingIndex >= 0) {
+                    // Increment quantity
+                    ingredients[existingIndex].quantity += 1;
+                } else {
+                    // Add new ingredient
+                    ingredients.push({
+                        id: id,
+                        name: name,
+                        price: price,
+                        quantity: 1
+                    });
+                }
+                
+                updateIngredientsList();
+            });
+        });
+        
+        // Update the ingredients list display
+        function updateIngredientsList() {
+            const container = document.getElementById('selectedIngredients');
+            const noIngredientsMsg = document.getElementById('noIngredientsMsg');
+            
+            // Clear current list
+            container.innerHTML = '';
+            
+            if (ingredients.length === 0) {
+                container.appendChild(noIngredientsMsg);
+                document.getElementById('ingredients_json').value = '[]';
+                document.getElementById('total_cost').value = '0.00';
+                return;
+            }
+            
+            let totalCost = 0;
+            
+            // Add each ingredient to the list
+            ingredients.forEach((ing, index) => {
+                const itemTotal = ing.price * ing.quantity;
+                totalCost += itemTotal;
+                
+                const item = document.createElement('div');
+                item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                item.innerHTML = `
+                    <div>
+                        <strong>${ing.name}</strong> 
+                        <span class="badge bg-primary rounded-pill">x${ing.quantity}</span>
+                    </div>
+                    <div>
+                        <span class="me-2">$${itemTotal.toFixed(2)}</span>
+                        <button type="button" class="btn btn-sm btn-danger remove-ingredient" data-index="${index}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+            
+            // Update hidden field and total cost
+            document.getElementById('ingredients_json').value = JSON.stringify(ingredients);
+            document.getElementById('total_cost').value = totalCost.toFixed(2);
+            
+            // Update profit when final price changes
+            calculateProfit();
+            
+            // Add event listeners for remove buttons
+            document.querySelectorAll('.remove-ingredient').forEach(button => {
+                button.addEventListener('click', function() {
+                    const index = parseInt(this.getAttribute('data-index'));
+                    ingredients.splice(index, 1);
+                    updateIngredientsList();
+                });
+            });
+        }
+        
+        // Calculate profit when final price changes
+        document.getElementById('final_price').addEventListener('input', calculateProfit);
+        
+        function calculateProfit() {
+            const totalCost = parseFloat(document.getElementById('total_cost').value) || 0;
+            const finalPrice = parseFloat(document.getElementById('final_price').value) || 0;
+            const profit = finalPrice - totalCost;
+            
+            document.getElementById('profit').value = profit.toFixed(2);
+        }
+        
+        // Form validation
+        document.getElementById('customProductForm').addEventListener('submit', function(e) {
+            if (ingredients.length === 0) {
+                e.preventDefault();
+                alert('Please add at least one ingredient to the custom product.');
+                return false;
+            }
+            
+            const finalPrice = parseFloat(document.getElementById('final_price').value) || 0;
+            if (finalPrice <= 0) {
+                e.preventDefault();
+                alert('Please enter a valid final price.');
+                return false;
+            }
+        });
+    });
+</script>
+{% endblock %}

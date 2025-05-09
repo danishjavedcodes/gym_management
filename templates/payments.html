@@ -1,52 +1,208 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <a href="{{ url_for('receptionist_dashboard' if session['user_type'] == 'receptionist' else 'admin_dashboard') }}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back
-            </a>
+<div class="container mt-4">
+    <h2>Payments Management</h2>
+
+    <!-- Payments History Table -->
+    <div class="card mb-4">
+        <div class="card-header">
         </div>
-        <h2 class="text-2xl font-bold">Payments</h2>
-        <div>
-            <a href="{{ url_for('logout') }}" class="btn btn-danger">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
+        <div class="card-body">
+            <div class="table-responsive">
+                <h3>Payment History</h3>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Member ID</th>
+                            <th>Member Name</th>
+                            <th>Package</th>
+                            <th>Amount</th>
+                            <th>Additional Cost</th>
+                            <th>Comments</th>
+                            <th>Remaining Days</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in payments %}
+                        <tr>
+                            <td>{{ payment.date }}</td>
+                            <td>{{ payment.member_id }}</td>
+                            <td>{{ payment.member_name }}</td>
+                            <td>{{ payment.package }}</td>
+                            <td>Rs. {{ payment.amount }}</td>
+                            <td>Rs. {{ payment.additional_cost or 0 }}</td>
+                            <td>{{ payment.comments or '' }}</td>
+                            <td>{{ payment.remaining_days }} days</td>
+                            <td>
+                                <span class="badge {% if payment.status == 'Paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                    {{ payment.status }}
+                                </span>
+                                <td>
+                                    <!-- Replace the existing receipt button with this -->
+                                    <a href="{{ url_for('payment_receipt', member_id=payment.member_id, date=payment.date) }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-receipt"></i> Receipt
+                                    </a>
+                                </td>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Member ID</th>
-                    <th>Name</th>
-                    <th>Package</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for member in members %}
-                <tr>
-                    <td>{{ member.id }}</td>
-                    <td>{{ member.name }}</td>
-                    <td>{{ member.package }}</td>
-                    <td>{{ member.payment_status if member.payment_status else 'Pending' }}</td>
-                    <td>
-                        {% if not member.payment_status or member.payment_status == 'Pending' %}
-                        <form action="{{ url_for('add_payment') }}" method="POST" class="d-inline">
-                            <input type="hidden" name="member_id" value="{{ member.id }}">
-                            <input type="hidden" name="amount" value="{{ packages[member.package] if packages and member.package in packages else 0 }}">
-                            <button type="submit" class="btn btn-primary btn-sm">Record Payment</button>
-                        </form>
+    <!-- Pending Payments -->
+    <div class="card">
+        <div class="card-header">
+            <h4>Pending Payments</h4>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Member ID</th>
+                        <th>Member Name</th>
+                        <th>Package</th>
+                        <th>Package Price</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in payments %}
+                        {% if payment.remaining_days == 0 and payment.status == 'Pending' %}
+                        <tr>
+                            <td>{{ payment.member_id }}</td>
+                            <td>{{ payment.member_name }}</td>
+                            <td>{{ payment.package }}</td>
+                            <td>Rs. {{ packages[payment.package] }}</td>
+                            <td>
+                                <span class="badge bg-warning">{{ payment.status }}</span>
+                            </td>
+                            <!-- In the Pending Payments section, update the form -->
+                            <td>
+                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#paymentModal{{ payment.member_id }}">
+                                    Mark as Paid
+                                </button>
+                                <div class="modal fade" id="paymentModal{{ payment.member_id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Payment Details - {{ payment.member_name }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form action="{{ url_for('mark_payment_as_paid') }}" method="POST">
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="member_id" value="{{ payment.member_id }}">
+                                                    <input type="hidden" name="package_amount" value="{{ packages[payment.package] }}">
+                                                    
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Package Amount</label>
+                                                        <input type="text" class="form-control" value="Rs. {{ packages[payment.package] }}" readonly>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Package Discount (%)</label>
+                                                        <input type="number" class="form-control" name="package_discount" 
+                                                               value="0" min="0" max="100" step="1">
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Additional Cost</label>
+                                                        <input type="number" class="form-control" name="additional_cost" 
+                                                               value="0" min="0" step="0.01">
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Additional Cost Discount (%)</label>
+                                                        <input type="number" class="form-control" name="additional_discount" 
+                                                               value="0" min="0" max="100" step="1">
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Comments</label>
+                                                        <textarea class="form-control" name="comments" rows="3"></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                    <button type="submit" class="btn btn-primary">Mark as Paid</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
                         {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
+<script>
+function updateTotal(memberId, packageAmount) {
+    const additionalCost = parseFloat(document.getElementById('additionalCost' + memberId).value) || 0;
+    const discountPercent = parseFloat(document.getElementById('discount' + memberId).value) || 0;
+    
+    let subtotal = packageAmount + additionalCost;
+    const discountAmount = (subtotal * discountPercent) / 100;
+    const total = subtotal - discountAmount;
+    
+    document.getElementById('totalAmount' + memberId).value = 'Rs. ' + total.toFixed(2);
+}
+
+<!-- Add this modal at the end of the body -->
+<div class="modal fade" id="receiptModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Receipt</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="receiptContent">
+                <!-- Receipt content will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="printReceipt()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <button type="button" class="btn btn-primary" onclick="downloadReceipt()">
+                    <i class="fas fa-download"></i> Download PDF
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this JavaScript -->
+<script>
+function viewReceipt(memberId, date) {
+    fetch(`/payment/receipt/${memberId}/${date}`)
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('receiptContent').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('receiptModal')).show();
+        });
+}
+
+function printReceipt() {
+    const printWindow = window.open('', '', 'width=800,height=600');
+    printWindow.document.write(document.getElementById('receiptContent').innerHTML);
+    printWindow.document.close();
+    printWindow.print();
+}
+
+function downloadReceipt() {
+    const memberId = document.getElementById('receiptContent').getAttribute('data-member-id');
+    const date = document.getElementById('receiptContent').getAttribute('data-date');
+    window.location.href = `/payment/receipt/download/${memberId}/${date}`;
+}
+</script>
 {% endblock %}

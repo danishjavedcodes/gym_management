@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Edit Staff Member</h2>
+    <div class="card">
+        <div class="card-body">
+            <form action="{{ url_for('edit_staff', username=staff.username) }}" method="POST">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Staff Type</label>
+                        <select class="form-control" name="staff_type" required>
+                            <option value="receptionist" {% if staff.staff_type == 'receptionist' %}selected{% endif %}>Receptionist</option>
+                            <option value="trainer" {% if staff.staff_type == 'trainer' %}selected{% endif %}>Trainer</option>
+                            <option value="cleaner" {% if staff.staff_type == 'cleaner' %}selected{% endif %}>Cleaner</option>
+                            <option value="manager" {% if staff.staff_type == 'manager' %}selected{% endif %}>Manager</option>
+                            <option value="others" {% if staff.staff_type == 'others' %}selected{% endif %}>Others</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" class="form-control" name="phone" value="{{ staff.phone }}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" name="name" value="{{ staff.name }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Gender</label>
+                        <select class="form-control" name="gender" required>
+                            <option value="Male" {% if staff.gender == 'Male' %}selected{% endif %}>Male</option>
+                            <option value="Female" {% if staff.gender == 'Female' %}selected{% endif %}>Female</option>
+                            <option value="Other" {% if staff.gender == 'Other' %}selected{% endif %}>Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Date of Birth</label>
+                        <input type="date" class="form-control" name="dob" value="{{ staff.dob }}" required pattern="\d{2}-\d{2}-\d{4}" placeholder="DD-MM-YYYY">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Age</label>
+                        <input type="number" class="form-control" name="age" value="{{ staff.age }}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea class="form-control" name="address" required rows="2">{{ staff.address }}</textarea>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Next of Kin Name</label>
+                        <input type="text" class="form-control" name="next_of_kin_name" value="{{ staff.next_of_kin_name }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Next of Kin Phone</label>
+                        <input type="tel" class="form-control" name="next_of_kin_phone" value="{{ staff.next_of_kin_phone }}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Salary</label>
+                        <input type="number" class="form-control" name="salary" value="{{ staff.salary }}" required>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Permissions</label>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_members" 
+                               {% if 'members' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Members</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_member_attendance" 
+                               {% if 'member_attendance' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Member Attendance</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_staff_attendance" 
+                               {% if 'staff_attendance' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Staff Attendance</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_payments" 
+                               {% if 'payments' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Payments</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_reports" 
+                               {% if 'reports' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">View Reports</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_staff" 
+                               {% if 'staff' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Staff</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_sales" 
+                               {% if 'sales' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Sales</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_inventory" 
+                               {% if 'inventory' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Inventory</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="perm_packages" 
+                               {% if 'packages' in staff.privileges %}checked{% endif %}>
+                        <label class="form-check-label">Manage Packages</label>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Update Staff Member</button>
+                    <a href="{{ url_for('manage_receptionists') }}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

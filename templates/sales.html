@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h3">Inventory Sales</h2>
+        <a href="{{ url_for('admin_dashboard' if session.user_type == 'admin' else 'staff_dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white">
+            <h3 class="card-title h4 mb-0">Record New Sale</h3>
+        </div>
+        <div class="card-body">
+            <!-- Staff Name (Read-only) -->
+            <div class="mb-3">
+                <label class="form-label">Staff</label>
+                <input type="text" class="form-control" value="{{ session.username }}" readonly>
+            </div>
+
+            <!-- Payment Method -->
+            <div class="mb-3">
+                <label class="form-label">Payment Method</label>
+                <select class="form-select" id="paymentMethod">
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="Online Paymrny">Online Paymrny</option>
+                </select>
+            </div>
+
+            <!-- Total Amount (Auto-calculated) -->
+            <div class="mb-3">
+                <label class="form-label">Total Amount (Rs. )</label>
+                <input type="text" class="form-control" id="totalAmount" readonly>
+            </div>
+
+            <!-- Item Selection Row -->
+            <div class="row align-items-end mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Select Item</label>
+                    <select class="form-select" id="itemSelect">
+                        <option value="">-- Select an item to add --</option>
+                        <!-- Regular Items -->
+                        <optgroup label="Regular Items">
+                            {% for item in inventory %}
+                            <option value="R_{{ item.id }}" data-price="{{ item.cost_per_serving + item.profit_per_serving }}">
+                                {{ item.stock_type }} (Rs. {{ item.cost_per_serving + item.profit_per_serving }})
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+                        <!-- Custom Products -->
+                        {% if custom_products %}
+                        <optgroup label="Custom Products">
+                            {% for product in custom_products %}
+                            <option value="C_{{ product.product_id }}" data-price="{{ product.final_price }}">
+                                {{ product.product_name }} (Rs. {{ product.final_price }})
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" class="form-control" id="itemQuantity" value="1" min="1">
+                </div>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-success w-100" id="addItemBtn">Add Item</button>
+                </div>
+            </div>
+
+            <!-- Selected Items Table -->
+            <div class="table-responsive">
+                <table class="table table-bordered" id="selectedItemsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Item</th>
+                            <th>Price/Serving</th>
+                            <th>Quantity</th>
+                            <th>Subtotal</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr id="noItemsRow">
+                            <td colspan="5" class="text-center text-muted">No items selected</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Record Sale Button -->
+            <div class="mt-4">
+                <button type="button" class="btn btn-primary btn-lg w-100" id="recordSaleBtn">Record Sale</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sales History Table -->
+<div class="card shadow-sm">
+    <div class="card-header bg-white">
+        <h3 class="card-title h4 mb-0">Sales History</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Staff Name</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Payment Method</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in recent_sales|reverse %}
+                    <tr>
+                        <td>{{ sale.staff_name }}</td>
+                        <td>{{ sale.date.split(' ')[0] if ' ' in sale.date else sale.date }}</td>
+                        <td>Rs. {{ "%.2f"|format(sale.total_amount) }}</td>
+                        <td><span class="badge bg-info">{{ sale.payment_method|title }}</span></td>
+                        <td>
+                            <a href="{{ url_for('view_receipt', sale_id=sale.id) }}" 
+                               class="btn btn-primary btn-sm">
+                                <i class="fas fa-receipt me-1"></i>View Receipt
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not recent_sales %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-3">No sales recorded yet</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Keep existing JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectedItems = new Map();
+    let totalAmount = 0;
+
+    function updateTotal() {
+        totalAmount = Array.from(selectedItems.values()).reduce((sum, item) => sum + item.subtotal, 0);
+        document.getElementById('totalAmount').value = 'Rs. ' + totalAmount.toFixed(2);
+    }
+
+    function removeItem(itemId) {
+        selectedItems.delete(itemId);
+        updateTable();
+        updateTotal();
+    }
+
+    function updateTable() {
+        const tbody = document.getElementById('selectedItemsTable').querySelector('tbody');
+        tbody.innerHTML = '';
+
+        if (selectedItems.size === 0) {
+            tbody.innerHTML = `
+                <tr id="noItemsRow">
+                    <td colspan="5" class="text-center text-muted">No items selected</td>
+                </tr>`;
+            return;
+        }
+
+        selectedItems.forEach((item, itemId) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${item.name}</td>
+                <td>Rs. ${item.price.toFixed(2)}</td>
+                <td>${item.quantity}</td>
+                <td>Rs. ${item.subtotal.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" onclick="removeItem('${itemId}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    document.getElementById('addItemBtn').addEventListener('click', function() {
+        const select = document.getElementById('itemSelect');
+        const option = select.selectedOptions[0];
+        if (!option.value) return;
+
+        const quantity = parseInt(document.getElementById('itemQuantity').value);
+        const price = parseFloat(option.dataset.price);
+        const subtotal = price * quantity;
+
+        selectedItems.set(option.value, {
+            name: option.text.split(' (Rs. ')[0],
+            price: price,
+            quantity: quantity,
+            subtotal: subtotal
+        });
+
+        updateTable();
+        updateTotal();
+
+        // Reset selection
+        select.value = '';
+        document.getElementById('itemQuantity').value = '1';
+    });
+
+    // Make removeItem function globally available
+    window.removeItem = removeItem;
+
+    document.getElementById('recordSaleBtn').addEventListener('click', function() {
+        if (selectedItems.size === 0) {
+            alert('Please add at least one item to the sale.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('payment_method', document.getElementById('paymentMethod').value);
+        formData.append('total_amount', totalAmount);
+        formData.append('items', JSON.stringify(Array.from(selectedItems.entries())));
+
+        fetch('/sales/add', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = data.redirect;
+            } else {
+                alert(data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while processing the sale.');
+        });
+    });
+});
+</script>
+{% endblock %}

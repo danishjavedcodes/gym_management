@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitness Base</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="bg-gray-800 shadow-lg">
+        <div class="flex h-16 items-center px-4 justify-between">
+            <div class="flex items-center">
+                <a href="{{ url_for('admin_dashboard') }}" class="text-white flex items-center mr-4">
+                    <i class="fas fa-dumbbell mr-2"></i>
+                    <span class="font-bold text-lg">Fitness Base</span>
+                </a>
+                
+                <div class="flex items-center space-x-2">
+                    <a href="{{ url_for('view_members') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Manage Members
+                    </a>
+                    <a href="{{ url_for('attendance') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Attendance
+                    </a>
+                    <a href="{{ url_for('staff_attendance') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Staff Attendance
+                    </a>
+                    <a href="{{ url_for('packages') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Manage Packages
+                    </a>
+                    <a href="{{ url_for('manage_receptionists') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Manage Staff
+                    </a>
+                    <a href="{{ url_for('inventory') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Manage Inventory
+                    </a>
+                    <a href="{{ url_for('sales') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        Manage Sales
+                    </a>
+                    <a href="{{ url_for('payments') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        View Payments
+                    </a>
+                    <a href="{{ url_for('reports') }}" class="text-white hover:bg-gray-700 px-2 py-2 rounded">
+                        View Reports
+                    </a>
+                </div>
+            </div>
+            
+            <div class="text-white font-medium">
+                {{ session.get('username', 'Admin') }}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

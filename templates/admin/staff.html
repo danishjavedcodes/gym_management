@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+            <h5 class="mb-0"><i class="fas fa-users me-2"></i>Staff Management</h5>
+            <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addStaffModal">
+                <i class="fas fa-plus me-1"></i> Add New Staff
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="text-center" style="width: 4%">ID</th>
+                            <th style="width: 8%">Type</th>
+                            <th style="width: 12%">Name</th>
+                            <th style="width: 10%">Username</th>
+                            <th style="width: 10%">Phone</th>
+                            <th style="width: 10%">Address</th>
+                            <th style="width: 8%">DOB</th>
+                            <th style="width: 5%">Age</th>
+                            <th style="width: 7%">Gender</th>
+                            <th style="width: 8%">Salary</th>
+                            <th style="width: 12%">Next of Kin</th>
+                            <th style="width: 12%">Kin Contact</th>
+                            <th style="width: 15%">Privileges</th>
+                            <th style="width: 8%" class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for member in staff %}
+                        <tr>
+                            <td class="text-center fw-bold">{{ loop.index }}</td>
+                            <td><span class="badge bg-info text-dark">{{ member.staff_type|title }}</span></td>
+                            <td class="fw-semibold">{{ member.name }}</td>
+                            <td><code>{{ member.username }}</code></td>
+                            <td>{{ member.phone }}</td>
+                            <td>{{ member.address }}</td>
+                            <td>{{ member.dob }}</td>
+                            <td class="text-center">{{ member.age }}</td>
+                            <td>{{ member.gender }}</td>
+                            <td class="text-end">₨{{ member.salary }}</td>
+                            <td>{{ member.next_of_kin_name }}</td>
+                            <td>{{ member.next_of_kin_phone }}</td>
+                            <td>
+                                {% set privs = member.privileges.split(',') %}
+                                {% for priv in privs %}
+                                    <span class="badge bg-secondary me-1">{{ priv }}</span>
+                                {% endfor %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('edit_staff', username=member.username) }}" 
+                                       class="btn btn-outline-primary" 
+                                       title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{{ url_for('delete_receptionist', username=member.username) }}" 
+                                       class="btn btn-outline-danger" 
+                                       onclick="return confirm('Are you sure you want to delete this staff member?')"
+                                       title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this CSS to your style section -->
+<style>
+    .table {
+        font-size: 0.9rem;
+    }
+    .table th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    .badge {
+        font-weight: 500;
+    }
+    .btn-group-sm > .btn {
+        padding: .25rem .5rem;
+    }
+    .card {
+        border-radius: 0.5rem;
+    }
+    .card-header {
+        border-radius: 0.5rem 0.5rem 0 0 !important;
+    }
+</style>
+
+<!-- Add Staff Modal -->
+<div class="modal fade" id="addStaffModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Staff Member</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Update Add Staff Modal form fields -->
+                <form action="{{ url_for('add_staff') }}" method="POST">
+                    <!-- Existing staff type section -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Staff Type</label>
+                            <select class="form-control" name="staff_type" id="staff_type" required onchange="toggleOtherType()">
+                                <option value="receptionist">Receptionist</option>
+                                <option value="trainer">Trainer</option>
+                                <option value="cleaner">Cleaner</option>
+                                <option value="manager">Manager</option>
+                                <option value="others">Others</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" class="form-control" name="phone" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Gender</label>
+                            <select class="form-control" name="gender" required>
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date of Birth</label>
+                            <input type="date" class="form-control" name="dob" required pattern="\d{2}-\d{2}-\d{4}" placeholder="DD-MM-YYYY">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Age</label>
+                            <input type="number" class="form-control" name="age" required min="18" max="100">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" name="username" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" name="password" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Address</label>
+                            <textarea class="form-control" name="address" required rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Next of Kin Name</label>
+                            <input type="text" class="form-control" name="next_of_kin_name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Next of Kin Phone</label>
+                            <input type="tel" class="form-control" name="next_of_kin_phone" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Salary</label>
+                            <input type="number" class="form-control" name="salary" required min="0">
+                        </div>
+                    </div>
+
+                    <!-- Existing permissions section -->
+                    <div class="mb-4">
+                        <label class="form-label">Permissions</label>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_members" name="perm_members">
+                            <label class="form-check-label" for="perm_members">Manage Members</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_member_attendance" name="perm_member_attendance">
+                            <label class="form-check-label" for="perm_member_attendance">Member Attendance</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_staff_attendance" name="perm_staff_attendance">
+                            <label class="form-check-label" for="perm_staff_attendance">Staff Attendance</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_payments" name="perm_payments">
+                            <label class="form-check-label" for="perm_payments">Manage Payments</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_reports" name="perm_reports">
+                            <label class="form-check-label" for="perm_reports">View Reports</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_staff" name="perm_staff">
+                            <label class="form-check-label" for="perm_staff">Manage Staff</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_sales" name="perm_sales">
+                            <label class="form-check-label" for="perm_sales">Manage Sales</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="perm_inventory" name="perm_inventory">
+                            <label class="form-check-label" for="perm_inventory">Manage Inventory</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Add Staff Member</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleOtherType() {
+    const staffType = document.getElementById('staff_type').value;
+    const otherTypeDiv = document.getElementById('other_type_div');
+    otherTypeDiv.style.display = staffType === 'others' ? 'block' : 'none';
+}
+</script>
+
+<!-- Edit Staff Modal -->
+{% for member in staff %}
+<div class="modal fade" id="editStaffModal{{ member.username }}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Staff Member</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('edit_staff', username=member.username) }}" method="POST" id="editStaffForm{{ member.username }}">
+                    <!-- Add novalidate to prevent browser validation -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Staff Type</label>
+                            <select class="form-control" name="staff_type" required>
+                                <option value="receptionist" {% if member.staff_type == 'receptionist' %}selected{% endif %}>Receptionist</option>
+                                <option value="trainer" {% if member.staff_type == 'trainer' %}selected{% endif %}>Trainer</option>
+                                <option value="cleaner" {% if member.staff_type == 'cleaner' %}selected{% endif %}>Cleaner</option>
+                                <option value="manager" {% if member.staff_type == 'manager' %}selected{% endif %}>Manager</option>
+                                <option value="others" {% if member.staff_type == 'others' %}selected{% endif %}>Others</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" class="form-control" name="phone" value="{{ member.phone }}" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" name="name" value="{{ member.name }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Gender</label>
+                            <select class="form-control" name="gender" required>
+                                <option value="Male" {% if member.gender == 'Male' %}selected{% endif %}>Male</option>
+                                <option value="Female" {% if member.gender == 'Female' %}selected{% endif %}>Female</option>
+                                <option value="Other" {% if member.gender == 'Other' %}selected{% endif %}>Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date of Birth</label>
+                            <input type="date" class="form-control" name="dob" value="{{ member.dob }}" required pattern="\d{2}-\d{2}-\d{4}" placeholder="DD-MM-YYYY">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Age</label>
+                            <input type="number" class="form-control" name="age" value="{{ member.age }}" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Address</label>
+                            <textarea class="form-control" name="address" required>{{ member.address }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Next of Kin Name</label>
+                            <input type="text" class="form-control" name="next_of_kin_name" value="{{ member.next_of_kin_name }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Next of Kin Phone</label>
+                            <input type="tel" class="form-control" name="next_of_kin_phone" value="{{ member.next_of_kin_phone }}" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Salary</label>
+                            <input type="number" class="form-control" name="salary" value="{{ member.salary }}" required>
+                        </div>
+                    </div>
+
+                    <!-- In the permissions section of the edit modal -->
+                    <div class="mb-3">
+                        <label class="form-label">Permissions</label>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_members" id="edit_perm_members_{{ member.username }}" {% if 'members' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_members_{{ member.username }}">Manage Members</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_member_attendance" id="edit_perm_member_attendance_{{ member.username }}" {% if 'member_attendance' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_member_attendance_{{ member.username }}">Member Attendance</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_staff_attendance" id="edit_perm_staff_attendance_{{ member.username }}" {% if 'staff_attendance' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_staff_attendance_{{ member.username }}">Staff Attendance</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_payments" id="edit_perm_payments_{{ member.username }}" {% if 'payments' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_payments_{{ member.username }}">Manage Payments</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_reports" id="edit_perm_reports_{{ member.username }}" {% if 'reports' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_reports_{{ member.username }}">View Reports</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_staff" id="edit_perm_staff_{{ member.username }}" {% if 'staff' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_staff_{{ member.username }}">Manage Staff</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_sales" id="edit_perm_sales_{{ member.username }}" {% if 'sales' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_sales_{{ member.username }}">Manage Sales</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="perm_inventory" id="edit_perm_inventory_{{ member.username }}" {% if 'inventory' in member.privileges %}checked{% endif %}>
+                            <label class="form-check-label" for="edit_perm_inventory_{{ member.username }}">Manage Inventory</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Update Staff Member</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
